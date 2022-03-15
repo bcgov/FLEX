@@ -1,0 +1,38 @@
+###--- REPRODUCE
+repro_FEMALE <- function(fishers=fishers, repro_estimates=repro.CI, Fpop="C") {
+  
+  # Random (binomial) selection for which adult females reproduce, based on denning rates confidence intervals
+  # fishers=w1$t0; fishers=tmp$t0; rm(fishers)
+  whoFishers <- of(agents = fishers, var = c("who","breed")) # "who" of the fishers before they reproduce
+  whoAFFishers <- whoFishers[whoFishers$breed=="adult",]$who
+  
+  denLCI=repro.CI[repro.CI$Pop==Fpop & repro.CI$Param=="L95CI",]$dr
+  denUCI=repro.CI[repro.CI$Pop==Fpop & repro.CI$Param=="U95CI",]$dr
+  
+  # repro <- as.integer(rbernoulli(n=length(whoAFFishers), p=c(denLCI:denUCI))) # prob can be a range - use confidence intervals
+  repro <- rbinom(n = length(whoAFFishers), size=1, prob=denLCI:denUCI) # prob can be a range - use confidence intervals
+  fishers <- NLset(turtles = fishers, agents = turtle(fishers, who=whoAFFishers), var = "repro", val = repro)
+  
+  # Random selection for which adult females reproduce, based on denning mean and SD (Central Interior)
+  whoFishers <- as.data.frame(of(agents = fishers, var = c("who","repro"))) # "who" of the fishers before they reproduce
+  reproWho <- whoFishers[whoFishers$repro==1,]$who # "who" of fishers which reproduce
+  
+  ltrM=repro.CI[repro.CI$Pop==Fpop & repro.CI$Param=="mean",]$ls
+  ltrSD=repro.CI[repro.CI$Pop==Fpop & repro.CI$Param=="sd",]$ls
+  
+  # if there is at least one fisher reproducing
+  # have those fishers have offspring, based on the mean and sd of empirical data
+  if (length(reproWho) > 0) {
+    fishers <- hatch(turtles = fishers, who = reproWho, n=round(rnorm(n=1, mean=ltrM, sd=ltrSD)/2),breed="juvenile") # litter size based on empirical data (divided by 2 for female only model)
+    
+    # assign all of the offsprig as dispersing, change repro and age values to reflect newborn kits rather than their moms
+    allFishers <- of(agents=fishers, var="who")
+    offspring <- allFishers[!(allFishers %in% whoFishers$who)]
+    
+    fishers <- NLset(turtles = fishers, agents = turtle(fishers, who=offspring), var = "disperse", val = "D")
+    fishers <- NLset(turtles = fishers, agents = turtle(fishers, who=offspring), var = "age", val = 0) # just born so time step 0
+    fishers <- NLset(turtles = fishers, agents = turtle(fishers, who=offspring), var = "repro", val = 0) # just born not yet reproductive
+  }
+  
+  return(fishers)
+}
