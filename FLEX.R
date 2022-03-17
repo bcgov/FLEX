@@ -6,7 +6,7 @@
 ## If exact location is required, functions will be: `sim$.mods$<moduleName>$FunctionName`.
 defineModule(sim, list(
   name = "FLEX",
-  description = "The FLEX tool will use BC government warehouse publicly available layers to build the landbase and empirical and expert data to specify "suitable" fisher habitat (i.e., the relative probability of occupancy) as per the BC Fisher Habitat Working Group habitat retention tools guidance (https://www.bcfisherhabitat.ca/habitat-tools/) and the Weir and Corbould (2010) predictive variable for "openness". This input layer may change but regardless of the underlying data, the important piece is that whatever data is used will produce a single "suitable" value for the female fisher territory sized cell to be used in the fisher population model (i.e., Individual Based Model; IBM). The initial simulations used a binary value to differentiate suitable (1) from unsuitable (0) habitat. Once an actual landbase is connected to the IBM, this will be a threshold value, written as an argument function, with the ability of the user to specify. For the first beta version of the R shiny app, the assumption is that the habitat quality is static once the tool starts (i.e., not dynamically changing during the scenarios) while the fisher population will be predicted for 20 years.",
+  description = "The FLEX tool will use BC government warehouse publicly available layers to build the landbase and empirical and expert data to specify 'suitable' fisher habitat (i.e., the relative probability of occupancy) as per the BC Fisher Habitat Working Group habitat retention tools guidance (https://www.bcfisherhabitat.ca/habitat-tools/) and the Weir and Corbould (2010) predictive variable for 'openness'. This input layer may change but regardless of the underlying data, the important piece is that whatever data is used will produce a single 'suitable' value for the female fisher territory sized cell to be used in the fisher population model (i.e., Individual Based Model; IBM). The initial simulations used a binary value to differentiate suitable (1) from unsuitable (0) habitat. Once an actual landbase is connected to the IBM, this will be a threshold value, written as an argument function, with the ability of the user to specify. For the first beta version of the R shiny app, the assumption is that the habitat quality is static once the tool starts (i.e., not dynamically changing during the scenarios) while the fisher population will be predicted for 20 years.",
   keywords = c("Fisher", "planning tool", "landscape simulation", "agent based model"),
   authors = structure(list(list(given = "Tati", family = "Micheletti", 
                                 role = "aut", email = "tati.micheletti@gmail.com", 
@@ -20,37 +20,70 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("README.md", "FLEX.Rmd"), ## same file
-  reqdPkgs = list("SpaDES.core (>=1.0.10)", "ggplot2"),
+  reqdPkgs = list("SpaDES.core (>=1.0.10)", "ggplot2", "NetLogoR",
+                  "magrittr", "raster", "dplyr", "Cairo", "stringr",
+                  "tidyr", "data.table", "qs","PNWColors", "sf"),
   parameters = rbind(
     #defineParameter("paramName", "paramClass", value, min, max, "parameter description"),
-    defineParameter(".plots", "character", "screen", NA, NA,
-                    "Used by Plots function, which can be optionally used here"),
-    defineParameter(".plotInitialTime", "numeric", start(sim), NA, NA,
-                    "Describes the simulation time at which the first plot event should occur."),
-    defineParameter(".plotInterval", "numeric", NA, NA, NA,
-                    "Describes the simulation time interval between plot events."),
-    defineParameter(".saveInitialTime", "numeric", NA, NA, NA,
-                    "Describes the simulation time at which the first save event should occur."),
-    defineParameter(".saveInterval", "numeric", NA, NA, NA,
-                    "This describes the simulation time interval between save events."),
-    ## .seed is optional: `list('init' = 123)` will `set.seed(123)` for the `init` event only.
-    defineParameter(".seed", "list", list(), NA, NA,
-                    "Named list of seeds to use for each event (names)."),
+    defineParameter(".plots", "logical", TRUE, NA, NA,
+                    "Should the simulation save output plots?"),
     defineParameter(".useCache", "logical", FALSE, NA, NA,
-                    "Should caching of events or module be used?")
-  ),
-  inputObjects = bindrows(
-    #expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
-    expectsInput(objectName = NA, objectClass = NA, desc = NA, sourceURL = NA)
+                    "Should caching of events or module be used?"),
+    defineParameter("iterations", "numeric", 100, NA, NA,
+                    "How many iterations or replicates should be run?"),
+    defineParameter("yrs.to.run", "numeric", 10, NA, NA,
+                    "How many years should the simulation run for?"),
+    defineParameter("nFemales", "numeric", 10, NA, NA,
+                    "What is the initial number of femlaes to be used?"),
+    defineParameter("maxAgeFemale", "numeric", 9, NA, NA,
+                    "What is the maximum age a female can have?"),
+    defineParameter("dist_mov", "numeric", 1.0, NA, NA,
+                    "Distance of movement across landscape per time step"),
+    defineParameter("sim_order", "numeric", 2, NA, NA,
+                    ""),
+    defineParameter("TS", "numeric", 12, NA, NA,
+                    ""),
+    defineParameter("name_out", "character", "Pex2", NA, NA,
+                    "")
+    ),
+  inputObjects = bindrows( #TODO: JB to complete
+    expectsInput(objectName = "repro.CI", objectClass = "data.table", 
+                 desc = paste0("Table with the following hearders: ",
+                               "Param: mean, sd, L95CI, U95CI",
+                               "dr: XXXX",
+                               "ls: XXXX", 
+                               "Pop: Population the data belongs to",
+                               " This table is the reproduction table for Fisher",
+                               " published in XXXXX (20XX)"),  
+                 sourceURL = NA), #TODO: Eventually it would be good to have these files in the cloud (i.e., GDrive)
+    expectsInput(objectName = "rf_surv_estimates", objectClass = "data.table", 
+                 desc = paste0("Table with the following hearders: ",
+                               "Surv: mean female survival (0-1)",
+                               "L95CI: lower confidence interval for survival (0-1)",
+                               "U95CI: upper confidence interval for survival (0-1)",
+                               "Cohort: Which cohort does the data belong to? ",
+                               "(Uppercase letters)",
+                               "Taken from Rory's updated survival, trapping",
+                               " mortality excluded"), 
+                 sourceURL = NA),
+    expectsInput(objectName = "IBM_aoi", objectClass = "list", 
+                 desc = paste0("Named list containing two objects: aoi, raoi",
+                               "aoi: sf multipolygon indicating population, ",
+                               "grid and habitat",
+                               "raoi: raster version of aoi"),  
+                 sourceURL = NA)
   ),
   outputObjects = bindrows(
-    #createsOutput("objectName", "objectClass", "output object description", ...),
-    createsOutput(objectName = NA, objectClass = NA, desc = NA)
+    createsOutput(objectName = "Fpop", objectClass = "character", 
+                  desc = "Describes which population the simulation is running for"),
+    createsOutput(objectName = "w1", objectClass = "", 
+                  desc = ""),
+    createsOutput(objectName = "B.w1_real.FEMALE", objectClass = "list", 
+                  desc = "")
   )
 ))
 
 ## event types
-#   - type `init` is required for initialization
 
 doEvent.FLEX = function(sim, eventTime, eventType) {
   switch(
@@ -58,126 +91,83 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
     init = {
       ### check for more detailed object dependencies:
       ### (use `checkObject` or similar)
+      sim$w1 <- set_up_REAL_world_FEMALE(nFemales = P(sim)$nFemales,
+                                         maxAgeFemale = P(sim)$maxAgeFemale,
+                                         raoi = sim$IBM_aoi$raoi)
+      if (P(sim)$.plots) sim$w1
       
-      # do stuff for this event
-      sim <- Init(sim)
-      
+      sim$Fpop <- unique(substr(sim$IBM_aoi$aoi$Fpop,1,1))
+        
       # schedule future event(s)
-      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "FLEX", "plot")
-      sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "FLEX", "save")
+      sim <- scheduleEvent(sim, time(sim), "FLEX", "runSimulation")
+      sim <- scheduleEvent(sim, time(sim), "FLEX", "generateOutputs")
     },
-    plot = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
+    runSimulation = {
       
-      plotFun(sim) # example of a plotting function
-      # schedule future event(s)
+      B.w1_real.FEMALE.sim100 <- vector('list', P(sim)$iterations)
+      for(i in 1:P(sim)$iterations){
+        B.w1_real.FEMALE.sim100[[i]] <- FEMALE_IBM_simulation_same_world(land = sim$w1$land, 
+                                                                         t0 = sim$w1$t0,
+                                                                         repro_estimates = sim$repro.CI, 
+                                                                         Fpop = sim$Fpop,
+                                                                         surv_estimates = sim$rf_surv_estimates,
+                                                                         maxAgeFemale = P(sim)$maxAgeFemale,
+                                                                         dist_mov = P(sim)$dist_mov,
+                                                                         yrs.to.run = P(sim)$yrs.to.run)
+      }
       
-      # e.g.,
-      #sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "FLEX", "plot")
+      sim$B.w1_real.FEMALE <- list(sim$w1, 
+                                   B.w1_real.FEMALE.sim100)
       
-      # ! ----- STOP EDITING ----- ! #
+      # Schedule next event
+      sim <- scheduleEvent(sim, time(sim) + 1, "FLEX", "runSimulation")
     },
-    save = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
+    generateOutputs = {
+      sim$B.w1_real <- ABM_fig_1sim(sim_out = sim$B.w1_real.FEMALE, 
+                                    numsims = P(sim)$iterations, 
+                                    yrs_sim = P(sim)$yrs.to.run, 
+                                    Fpop = sim$Fpop)
       
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
+      if (P(sim)$.plots) sim$B.w1_real
       
-      # schedule future event(s)
+      sim$B.w1_real_heatmap <- heatmap_output(sim_out = sim$B.w1_real.FEMALE, 
+                                              sim_order = P(sim)$sim_order, 
+                                              numsims = P(sim)$iterations, 
+                                              yrs_sim = P(sim)$yrs.to.run, 
+                                              TS = P(sim)$TS, 
+                                              name_out = P(sim)$name_out)
+
+      if (P(sim)$.plots){
+        
+        Cairo(file = file.path(Paths$outputPath, "IBM_MeanSE_Pex2.PNG"),
+              type = "png", width = 3000, height = 2200, 
+              pointsize = 15, bg = "white", dpi = 300)
+        sim$B.w1_real$sim.TS.plot_se
+        dev.off()
+        
+        # plot of initial starting points for adult female fishers
+        Cairo(file = file.path(Paths$outputPath, "IBM_Saoi_Pex2.PNG"),
+              type = "png", width = 3000, height = 2200, pointsize = 15,
+              bg = "white", dpi = 300)
+        raster::plot(sim$B.w1_real.FEMALE[[1]]$land, 
+             legend = FALSE, 
+             main = "Simulated Fisher Established Territories within Area of Interest")
+        points(sim$B.w1_real.FEMALE[[1]]$t0, 
+               pch = sim$B.w1_real.FEMALE[[1]]$t0$shape, 
+               col = of(agents = sim$B.w1_real.FEMALE[[1]]$t0, 
+                        var = "color"))
+        dev.off()
+        
+        raster::plot(sim$B.w1_real_heatmap$raster)
+        
+      }
       
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + P(sim)$.saveInterval, "FLEX", "save")
-      
-      # ! ----- STOP EDITING ----- ! #
-    },
-    event1 = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
-      
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
-      
-      # schedule future event(s)
-      
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + increment, "FLEX", "templateEvent")
-      
-      # ! ----- STOP EDITING ----- ! #
-    },
-    event2 = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
-      
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
-      
-      # schedule future event(s)
-      
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + increment, "FLEX", "templateEvent")
-      
-      # ! ----- STOP EDITING ----- ! #
+      # Schedule next event
+      sim <- scheduleEvent(sim, time(sim) + 1, "FLEX", "generateOutputs")
     },
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
                   "\' in module \'", current(sim)[1, "moduleName", with = FALSE], "\'", sep = ""))
   )
-  return(invisible(sim))
-}
-
-## event functions
-#   - keep event functions short and clean, modularize by calling subroutines from section below.
-
-### template initialization
-Init <- function(sim) {
-  # # ! ----- EDIT BELOW ----- ! #
-  
-  # ! ----- STOP EDITING ----- ! #
-  
-  return(invisible(sim))
-}
-
-### template for save events
-Save <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  # do stuff for this event
-  sim <- saveFiles(sim)
-  
-  # ! ----- STOP EDITING ----- ! #
-  return(invisible(sim))
-}
-
-### template for plot events
-plotFun <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  # do stuff for this event
-  sampleData <- data.frame("TheSample" = sample(1:10, replace = TRUE))
-  Plots(sampleData, fn = ggplotFn)
-  
-  # ! ----- STOP EDITING ----- ! #
-  return(invisible(sim))
-}
-
-### template for your event1
-Event1 <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  # THE NEXT TWO LINES ARE FOR DUMMY UNIT TESTS; CHANGE OR DELETE THEM.
-  # sim$event1Test1 <- " this is test for event 1. " # for dummy unit test
-  # sim$event1Test2 <- 999 # for dummy unit test
-  
-  # ! ----- STOP EDITING ----- ! #
-  return(invisible(sim))
-}
-
-### template for your event2
-Event2 <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  # THE NEXT TWO LINES ARE FOR DUMMY UNIT TESTS; CHANGE OR DELETE THEM.
-  # sim$event2Test1 <- " this is test for event 2. " # for dummy unit test
-  # sim$event2Test2 <- 777  # for dummy unit test
-  
-  # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
 
@@ -200,15 +190,23 @@ Event2 <- function(sim) {
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
   
-  # ! ----- EDIT BELOW ----- ! #
+  if (!suppliedElsewhere(object = "repro.CI", sim = sim)){
+    sim$repro.CI <- fread(file.path(Paths[["modulePath"]], 
+                                    currentModule(sim), 
+                                    "data/repro.CI.csv"))
+  }
   
-  # ! ----- STOP EDITING ----- ! #
+  if (!suppliedElsewhere(object = "IBM_aoi", sim = sim)){
+    sim$IBM_aoi <- qread(file.path(Paths[["modulePath"]],
+                                     currentModule(sim), 
+                                     "data/IBM_aoi_Pex2.qs"))
+  }
+  
+  if (!suppliedElsewhere(object = "rf_surv_estimates", sim = sim)){
+    sim$rf_surv_estimates <- fread(file.path(Paths[["modulePath"]],
+                                               currentModule(sim), 
+                                               "data/rf_surv_estimates.csv"))
+    }
+  
   return(invisible(sim))
 }
-
-ggplotFn <- function(data, ...) {
-  ggplot(data, aes(TheSample)) +
-    geom_histogram(...)
-}
-
-### add additional events as needed by copy/pasting from above
