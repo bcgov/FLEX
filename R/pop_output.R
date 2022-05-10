@@ -5,7 +5,7 @@ pop_output <- function(sim_out,
                        yrs_sim){
   # sim_out=Boreal_escape_FEMALE_binom
   # sim_order=c(4:6)
-  num.runs <- yrs_sim + 2
+  num.runs <- yrs_sim + 1
   ABM.df <- as.data.frame(array(NA,c(num.runs*numsims*length(sim_order),4)))
   colnames(ABM.df) <- c("Run","TimeStep","Count","Sim")
   

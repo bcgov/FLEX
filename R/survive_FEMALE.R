@@ -5,10 +5,13 @@
 # create a function that runs each time step to determine the probability of a fisher surviving to the next time step
 # also need to kill off any fishers that are over 8 years (female) and 4 years (male)
 # *** UPDATE - not enough fishers were surviving when using age survival probabilities, changed to cohort level probabilities
+# need to consider the revised vital rates from Eric - can't have such huge CIs or will die within a couple generations - how to rectify?
 
-survive_FEMALE <- function(fishers=fishers, surv_estimates=rf_surv_estimates, Fpop="C", maxAgeFemale=9) {
+survive_FEMALE <- function(fishers, 
+                           surv_estimates,
+                           Fpop,
+                           maxAgeFemale){
   
-  # fishers=t1; fishers=tmp3
   survFishers <- of(agents = fishers, var = c("who","breed","disperse","age")) # "who" of the fishers at start of survival
   survFishers$Cohort <- toupper(paste0(rep(Fpop,times=nrow(survFishers)),rep("F",times=nrow(survFishers)),survFishers$sex,substr(survFishers$breed,1,1)))
   
@@ -21,7 +24,7 @@ survive_FEMALE <- function(fishers=fishers, surv_estimates=rf_surv_estimates, Fp
     # i=1; rm(i)
     if(survFishers[i,]$age!=0){ # can't kill off juveniles that haven't reached 6 months
       # survFishers[i,]$live <- as.integer(rbernoulli(n=1, p=c(survFishers[i,]$L95CL:survFishers[i,]$U95CL)))
-      survFishers[i,]$live <- rbinom(n=1, size=1, prob=survFishers[i,]$L95CL:survFishers[i,]$U95CL)
+      survFishers[i,]$live <- rbinom(n=1, size=1, prob=survFishers[i,]$SurvLSE:survFishers[i,]$SurvHSE)
     }
   }
   

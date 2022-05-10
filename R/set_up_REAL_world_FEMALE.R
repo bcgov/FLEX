@@ -1,19 +1,15 @@
-###--- SET-UP WORLD with actual aoi - for female only IBM
-set_up_REAL_world_FEMALE <- function(nFemales=nFemales, maxAgeFemale=maxAgeFemale,raoi=raoi){
-  # nFemales = 10
+###--- SET-UP WORLD bringin in land aoi created previously - for female only IBM
+set_up_REAL_world_FEMALE <- function(propFemales=propFemales, maxAgeFemale=maxAgeFemale, land=land){
+  # propFemales = 0.3
   # maxAgeFemale = 9
+  # land = land
+   
+  # Raster with mahalanobis distance (D2) values
+  # Use mahal_metric to determine 
+  cells.good.habitat <- sum(land)
+  # total.cells <- dim(land)[1]*dim(land)[2]
+  # actual.prop.hab <- cells.good.habitat / total.cells
   
-  nfishers = nFemales
-  
-  # Each cell is assumed to be the same size as one fisher territory
-  # Cell values are either 0 or 1
-  # Assume 0 = habitat unsuitable for fisher territory; 1 = suitable fisher habitat
-  # Upload the raster (binary for habitat)
-  cells.good.habitat <- sum(raoi@data@values)
-  total.cells <- raoi@ncols * raoi@nrows
-  actual.prop.hab <- cells.good.habitat / total.cells
-  
-  land <- raster2world(raoi)
   as.matrix(land@pCoords)
   
   # for some reason NetLogoR world matrices are set up differently from rasters
@@ -21,13 +17,19 @@ set_up_REAL_world_FEMALE <- function(nFemales=nFemales, maxAgeFemale=maxAgeFemal
   habM <- as.matrix(land@.Data)
   habMflipped <- habM[nrow(habM):1,]
   
+  # recall that Suitable Habitat for territories has a raster value of 1
   mHabitat <- which(habMflipped==1, arr.ind=TRUE)
   tmpMatrix <- matrix(1, nrow=nrow(mHabitat), ncol=ncol(mHabitat))
   NLmHabitat <- mHabitat - tmpMatrix
   
   fishers_start <- as.data.frame(NLmHabitat)
   colnames(fishers_start) <- c("pycor", "pxcor")
-  fishers_start$rank <- rank(round(runif(cells.good.habitat, min=100, max=999)))
+  fishers_start$rank <- rank(round(runif(cells.good.habitat, min=10000, max=999999)))
+  
+  # have the number of fishers be 30% of the good habitat cells
+  nFemales <- round(cells.good.habitat*propFemales)
+  nfishers = nFemales
+  
   fishers_start <- fishers_start %>% filter(rank <= nFemales) %>% dplyr::select(-rank)
   fishers_start <- fishers_start[c("pxcor","pycor")]
   
@@ -43,11 +45,26 @@ set_up_REAL_world_FEMALE <- function(nFemales=nFemales, maxAgeFemale=maxAgeFemal
   # have fishers randomly assigned a year between 2.5 and 1 year less than max life span
   yrs.adult <- (sample(5:((maxAgeFemale-1)*2), nfishers, replace=TRUE))/2
   t0 <- turtlesOwn(turtles=t0, tVar = c("age"), tVal = yrs.adult)
-  
+
   # Visualize the turtles on the landscape with their respective color
   plot(land)
   points(t0, pch = t0$shape, col = of(agents = t0, var = "color"))
   
-  return(list("land"=land, "t0"=t0, "actual.prop.hab"=actual.prop.hab))
+  # have females reproduce - set up kits and age everyone 1 year, ready to start 
+  t0 <- repro_FEMALE(fishers=t0, repro_estimates=repro_estimates, Fpop=Fpop)
+  
+  # t1	October	Kits are kicked out of natal territory
+  # 	Age 1 year (t0 and t1)
+  
+  age.val <- of(agents=t0, var=c("age"))+1
+  fishers <- NLset(turtles = t0, agents=turtle(t0, who=t0$who),var="age", val=age.val)
+  
+  return(fishers)
   
 }
+
+
+# fishers <- set_up_REAL_world_FEMALE(propFemales = 0.3,
+#                                    maxAgeFemale = 9,
+#                                    land = land)
+

@@ -3,8 +3,9 @@ sim_output <- function(sim_out,
                        simul, # Previously sim, but sim is a special name in SpaDES
                        numsims, 
                        yrs_sim){
-  # sim_out=B.w1_real.FEMALE; simul=2; numsims=100; yrs_sim=10
-  num.runs <- yrs_sim + 2
+  # sim_out=IBM; simul=2; numsims=100; yrs_sim=10
+  
+  num.runs <- yrs_sim + 1
   
   ABM.df <- as.data.frame(array(NA,c(numsims,num.runs)))
   colnames(ABM.df) <- paste0("TimeStep_",str_pad(seq_len(num.runs),2,pad="0"))
@@ -22,9 +23,9 @@ sim_output <- function(sim_out,
       # Only simulation 4 has the data of interest?
       DT <- as.array(sim_out[[simul]][[rps]][[ts]])
       
-      if (length(DT) != 0){
-        nAdults = as.numeric(table(DT$breed)["adult"])
-        nJuvenile = as.numeric(table(DT$breed)["juvenile"])
+      if (length(DT) > 1){
+        nAdults = as.numeric(table(DT[DT$disperse=="E"]$breed)["adult"])
+        nJuvenile = as.numeric(table(DT[DT$disperse=="E"]$breed)["juvenile"])
       } else {
         nAdults = 0
         nJuvenile = 0
