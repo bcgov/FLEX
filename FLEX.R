@@ -15,7 +15,7 @@ defineModule(sim, list(
                                 role = c("aut", "cre"), email = "Joanna.Burgar@gov.bc.ca", 
                                 comment = NULL)), class = "person"),
   childModules = character(0),
-  version = list(FLEX = "0.0.0.9000"),
+  version = list(FLEX = "0.0.1.0"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
@@ -29,21 +29,21 @@ defineModule(sim, list(
                     "Should the simulation save output plots?"),
     defineParameter(".useCache", "logical", FALSE, NA, NA,
                     "Should caching of events or module be used?"),
-    defineParameter("iterations", "numeric", 100, NA, NA,
-                    "How many iterations or replicates should be run?"),
+    # defineParameter("iterations", "numeric", 100, NA, NA,               # hard coding it in for 100 simulations - makes it easier for output
+    #                 "How many iterations or replicates should be run?"),
     defineParameter("yrs.to.run", "numeric", 10, NA, NA,
                     "How many years should the simulation run for?"),
-    defineParameter("nFemales", "numeric", 10, NA, NA,
-                    "What is the initial number of femlaes to be used?"),
+    defineParameter("propFemales", "numeric", 0.3, NA, NA,
+                    "What is the initial proportion of femlaes to suitable FETAs to start?"),
     defineParameter("maxAgeFemale", "numeric", 9, NA, NA,
                     "What is the maximum age a female can have?"),
     defineParameter("dist_mov", "numeric", 1.0, NA, NA,
                     "Distance of movement across landscape per time step"),
     defineParameter("sim_order", "numeric", 2, NA, NA,
                     ""),
-    defineParameter("TS", "numeric", 12, NA, NA,
-                    ""),
-    defineParameter("name_out", "character", "Pex2", NA, NA,
+    defineParameter("TS", "numeric", 10, NA, NA,
+                    "Year (timestep) to use when creating heatmap"),
+    defineParameter("name_out", "character", "Cariboo", NA, NA,
                     "")
     ),
   inputObjects = bindrows( #TODO: JB to complete
@@ -56,7 +56,7 @@ defineModule(sim, list(
                                " This table is the reproduction table for Fisher",
                                " published in XXXXX (20XX)"),  
                  sourceURL = NA), #TODO: Eventually it would be good to have these files in the cloud (i.e., GDrive)
-    expectsInput(objectName = "rf_surv_estimates", objectClass = "data.table", 
+    expectsInput(objectName = "surv_estimates", objectClass = "data.table", 
                  desc = paste0("Table with the following hearders: ",
                                "Surv: mean female survival (0-1)",
                                "L95CI: lower confidence interval for survival (0-1)",
@@ -66,19 +66,38 @@ defineModule(sim, list(
                                "Taken from Rory's updated survival, trapping",
                                " mortality excluded"), 
                  sourceURL = NA),
+    expectsInput(objectName = "mahal_metric", objectClass = "data.table", 
+                 desc = paste0("Table with the following hearders: ",
+                               "FHE_zone: Fisher Habitat Extension Zone Name",
+                               "FHE_zone_num: numeric value for each zone (1= Boreal, 2=Sub-Boreal moist, 3=Sub-Boreal dry, 4=Dry Forest",
+                               "Mean: XXXX",
+                               "SD: XXXX",
+                               "Max: XXXX",
+                               "Taken from Rich Weir's Mahalanobis distance analysis"), 
+                 sourceURL = NA),
     expectsInput(objectName = "IBM_aoi", objectClass = "list", 
-                 desc = paste0("Named list containing two objects: aoi, raoi",
-                               "aoi: sf multipolygon indicating population, ",
-                               "grid and habitat",
-                               "raoi: raster version of aoi"),  
-                 sourceURL = NA)
+                 desc = paste0("list containing two raster stacks: dynamic, static",
+                               "dynamic (raster stacks): Mahalanobis distance values; movement values",
+                               "raster stacks are clusObjects, updated every  5 years",
+                               "static: Fisher population (1=Boreal, 2=Columbian); Fisher Habitat Zone (1:4, as above)"),  
+                 sourceURL = NA),
   ),
   outputObjects = bindrows(
+    createsOutput(objectName = "rFpop", objectClass = "raster", 
+                  desc = "Raster layer assigning fisher population to each FETA"),
+    createsOutput(objectName = "rFHzone", objectClass = "raster", 
+                  desc = "Raster layer assigning fisher habitat zone to each FETA"),
+    createsOutput(objectName = "RMahal", objectClass = "RasterStack", 
+                  desc = "Raster stack assigning mahalanobis distance to each FETA"),
+    createsOutput(objectName = "rMove", objectClass = "RasterStack", 
+                  desc = "Raster stack assigning prop movement habitat to each FETA"),
     createsOutput(objectName = "Fpop", objectClass = "character", 
                   desc = "Describes which population the simulation is running for"),
-    createsOutput(objectName = "w1", objectClass = "", 
-                  desc = ""),
-    createsOutput(objectName = "B.w1_real.FEMALE", objectClass = "list", 
+    createsOutput(objectName = "fisher", objectClass = "agentMatrix object", 
+                  desc = "Describes the fishers (agents) on the land"),
+    createsOutput(objectName = "land", objectClass = "worldMatrix object", 
+                  desc = "Describes the underlying landscape, 0=unsuitable habitat, 1=suitable FETA"),
+    createsOutput(objectName = "EX_real.FEMALE", objectClass = "list", 
                   desc = "")
   )
 ))
@@ -91,12 +110,34 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
     init = {
       ### check for more detailed object dependencies:
       ### (use `checkObject` or similar)
-      sim$w1 <- set_up_REAL_world_FEMALE(nFemales = P(sim)$nFemales,
-                                         maxAgeFemale = P(sim)$maxAgeFemale,
-                                         raoi = sim$IBM_aoi$raoi)
-      if (P(sim)$.plots) sim$w1
       
-      sim$Fpop <- unique(substr(sim$IBM_aoi$aoi$Fpop,1,1))
+      # extract static raster layers
+      sim$rFpop <- sim$IBM_aoi$r_static$layer.1
+      sim$rFHzone <- sim$IBM_aoi$r_static$layer.2
+      
+      # extract dynamic raster layers
+      # sim$rMahal <- sim$IBM_aoi$r_dynamic[[1:(dim(IBM_aoi$r_dynamic)[3]/2)]]
+      # sim$rMove <- sim$IBM_aoi$r_dynamic[[(dim(IBM_aoi$r_dynamic)[3]/2+1):(dim(IBM_aoi$r_dynamic)[3])]]
+      
+      sim$rMahal <- sim$IBM_aoi$r_dynamic[[1]]
+      sim$rMove <- sim$IBM_aoi$r_dynamic[[3]]
+
+            # create underlying landbase for start of simulation
+      sim$land <- create_MAHAL_land(rFHzone = sim$rFHzone,
+                                    rMahal = sim$rMahal[[1]],
+                                    mahal_metric = sim$mahal_metric,
+                                    D2_param = P(sim)$D2_param)
+      
+      # create fishers for start of simulation
+      sim$fisher <- set_up_REAL_world_FEMALE(propFemales = P(sim)$propFemales,
+                                         maxAgeFemale = P(sim)$maxAgeFemale,
+                                         land = sim$land)
+      
+      
+      
+      # if (P(sim)$.plots) sim$land # not sure what this is for...
+      
+      sim$Fpop <- extract_Fpop(rFpop=sim$rFpop)
         
       # schedule future event(s)
       sim <- scheduleEvent(sim, time(sim), "FLEX", "runSimulation")
@@ -104,61 +145,64 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
     },
     runSimulation = {
       
-      B.w1_real.FEMALE.sim100 <- vector('list', P(sim)$iterations)
-      for(i in 1:P(sim)$iterations){
-        B.w1_real.FEMALE.sim100[[i]] <- FEMALE_IBM_simulation_same_world(land = sim$w1$land, 
-                                                                         t0 = sim$w1$t0,
-                                                                         repro_estimates = sim$repro.CI, 
-                                                                         Fpop = sim$Fpop,
-                                                                         surv_estimates = sim$rf_surv_estimates,
-                                                                         maxAgeFemale = P(sim)$maxAgeFemale,
-                                                                         dist_mov = P(sim)$dist_mov,
-                                                                         yrs.to.run = P(sim)$yrs.to.run)
+      EX_real.FEMALE.sim100 <- vector('list', 100)  # if not hard-coded, use this  'P(sim)$iterations' in place of 100
+      for(i in 1:100){
+        EX_real.FEMALE.sim100[[i]] <- FEMALE_IBM_simulation_same_world(land = sim$land, 
+                                                                       rMove=sim$rMove[[1]],
+                                                                       fisher = sim$fisher,
+                                                                       repro_estimates = sim$repro_CI,
+                                                                       Fpop = sim$Fpop,
+                                                                       surv_estimates = sim$surv_estimates,
+                                                                       maxAgeFemale = P(sim)$maxAgeFemale,
+                                                                       # yrs.to.run = P(sim)$yrs.to.run # removing this and changing it for event scheduler
+                                                                       dist_mov = P(sim)$dist_mov)
+        
       }
       
-      sim$B.w1_real.FEMALE <- list(sim$w1, 
-                                   B.w1_real.FEMALE.sim100)
+      sim$EX_real.FEMALE <- list(sim$w1, 
+                                   EX_real.FEMALE.sim100)
       
       # Schedule next event
       sim <- scheduleEvent(sim, time(sim) + 1, "FLEX", "runSimulation")
     },
     generateOutputs = {
-      sim$B.w1_real <- ABM_fig_1sim(sim_out = sim$B.w1_real.FEMALE, 
+      sim$EX_real <- ABM_fig_1sim(sim_out = sim$EX_real.FEMALE, 
                                     numsims = P(sim)$iterations, 
                                     yrs_sim = P(sim)$yrs.to.run, 
                                     Fpop = sim$Fpop)
       
-      if (P(sim)$.plots) sim$B.w1_real
+      if (P(sim)$.plots) sim$EX_real
       
-      sim$B.w1_real_heatmap <- heatmap_output(sim_out = sim$B.w1_real.FEMALE, 
+      sim$EX_real_heatmap <- heatmap_output(sim_out = sim$EX_real.FEMALE, 
                                               sim_order = P(sim)$sim_order, 
                                               numsims = P(sim)$iterations, 
                                               yrs_sim = P(sim)$yrs.to.run, 
-                                              TS = P(sim)$TS, 
+                                              TS = P(sim)$TS,
+                                              rextent = sim$rFpop,
                                               name_out = P(sim)$name_out)
 
       if (P(sim)$.plots){
         
-        Cairo(file = file.path(Paths$outputPath, "IBM_MeanSE_Pex2.PNG"),
+        Cairo(file = file.path(Paths$outputPath, "IBM_MeanSE.PNG"),
               type = "png", width = 3000, height = 2200, 
               pointsize = 15, bg = "white", dpi = 300)
-        sim$B.w1_real$sim.TS.plot_se
+        sim$EX_real$sim.TS.plot_se
         dev.off()
         
         # plot of initial starting points for adult female fishers
-        Cairo(file = file.path(Paths$outputPath, "IBM_Saoi_Pex2.PNG"),
+        Cairo(file = file.path(Paths$outputPath, "IBM_Saoi.PNG"),
               type = "png", width = 3000, height = 2200, pointsize = 15,
               bg = "white", dpi = 300)
-        raster::plot(sim$B.w1_real.FEMALE[[1]]$land, 
+        raster::plot(sim$EX_real.FEMALE[[1]]$land, 
              legend = FALSE, 
              main = "Simulated Fisher Established Territories within Area of Interest")
-        points(sim$B.w1_real.FEMALE[[1]]$t0, 
-               pch = sim$B.w1_real.FEMALE[[1]]$t0$shape, 
-               col = of(agents = sim$B.w1_real.FEMALE[[1]]$t0, 
+        points(sim$EX_real.FEMALE[[1]]$t0, 
+               pch = sim$EX_real.FEMALE[[1]]$t0$shape, 
+               col = of(agents = sim$EX_real.FEMALE[[1]]$t0, 
                         var = "color"))
         dev.off()
         
-        raster::plot(sim$B.w1_real_heatmap$raster)
+        raster::plot(sim$EX_real_heatmap$raster)
         
       }
       
@@ -191,21 +235,27 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
   
   if (!suppliedElsewhere(object = "repro.CI", sim = sim)){
-    sim$repro.CI <- fread(file.path(Paths[["modulePath"]], 
+    sim$repro_CI <- fread(file.path(Paths[["modulePath"]], 
                                     currentModule(sim), 
-                                    "data/repro.CI.csv"))
+                                    "data/repro_CI.csv"))
+  }
+  
+  if (!suppliedElsewhere(object = "mahal_metric", sim = sim)){
+    sim$IBM_aoi <- fread(file.path(Paths[["modulePath"]],
+                                   currentModule(sim), 
+                                   "data/mahal_metric.csv"))
   }
   
   if (!suppliedElsewhere(object = "IBM_aoi", sim = sim)){
     sim$IBM_aoi <- qread(file.path(Paths[["modulePath"]],
                                      currentModule(sim), 
-                                     "data/IBM_aoi_Pex2.qs"))
+                                     "data/EX_Cariboo_IBM_aoi.qs"))
   }
   
-  if (!suppliedElsewhere(object = "rf_surv_estimates", sim = sim)){
-    sim$rf_surv_estimates <- fread(file.path(Paths[["modulePath"]],
+  if (!suppliedElsewhere(object = "surv_estimates", sim = sim)){
+    sim$surv_estimates <- fread(file.path(Paths[["modulePath"]],
                                                currentModule(sim), 
-                                               "data/rf_surv_estimates.csv"))
+                                               "data/surv_estimates.csv"))
     }
   
   return(invisible(sim))
