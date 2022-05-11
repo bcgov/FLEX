@@ -44,4 +44,4 @@ land <- create_MAHAL_land(rFHzone = IBM_aoi$r_static[[2]], # 1=Boreal, 2=Sub-bor
                           mahal_metric = fread(file.path(paste0(getwd(),"/modules/FLEX/"),"data/mahal_metric.csv"), select=c(1:5)),
                           D2_param = "Max")
 
-
+# test commit
