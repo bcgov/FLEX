@@ -47,7 +47,7 @@ defineModule(sim, list(
                     "")
     ),
   inputObjects = bindrows( #TODO: JB to complete
-    expectsInput(objectName = "repro.CI", objectClass = "data.table", 
+    expectsInput(objectName = "repro_CI", objectClass = "data.table", 
                  desc = paste0("Table with the following hearders: ",
                                "Param: mean, sd, L95CI, U95CI",
                                "dr: XXXX",
@@ -83,14 +83,6 @@ defineModule(sim, list(
                  sourceURL = NA),
   ),
   outputObjects = bindrows(
-    createsOutput(objectName = "rFpop", objectClass = "raster", 
-                  desc = "Raster layer assigning fisher population to each FETA"),
-    createsOutput(objectName = "rFHzone", objectClass = "raster", 
-                  desc = "Raster layer assigning fisher habitat zone to each FETA"),
-    createsOutput(objectName = "RMahal", objectClass = "RasterStack", 
-                  desc = "Raster stack assigning mahalanobis distance to each FETA"),
-    createsOutput(objectName = "rMove", objectClass = "RasterStack", 
-                  desc = "Raster stack assigning prop movement habitat to each FETA"),
     createsOutput(objectName = "Fpop", objectClass = "character", 
                   desc = "Describes which population the simulation is running for"),
     createsOutput(objectName = "fisher", objectClass = "agentMatrix object", 
@@ -111,20 +103,10 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       ### check for more detailed object dependencies:
       ### (use `checkObject` or similar)
       
-      # extract static raster layers
-      sim$rFpop <- sim$IBM_aoi$r_static$layer.1
-      sim$rFHzone <- sim$IBM_aoi$r_static$layer.2
       
-      # extract dynamic raster layers
-      # sim$rMahal <- sim$IBM_aoi$r_dynamic[[1:(dim(IBM_aoi$r_dynamic)[3]/2)]]
-      # sim$rMove <- sim$IBM_aoi$r_dynamic[[(dim(IBM_aoi$r_dynamic)[3]/2+1):(dim(IBM_aoi$r_dynamic)[3])]]
-      
-      sim$rMahal <- sim$IBM_aoi$r_dynamic[[1]]
-      sim$rMove <- sim$IBM_aoi$r_dynamic[[3]]
-
-            # create underlying landbase for start of simulation
-      sim$land <- create_MAHAL_land(rFHzone = sim$rFHzone,
-                                    rMahal = sim$rMahal[[1]],
+      # create underlying landbase for start of simulation
+      sim$land <- create_MAHAL_land(rFHzone = sim$IBM_aoi$r_static$layer.2,
+                                    rMahal = sim$IBM_aoi$r_dynamic[[1:(dim(IBM_aoi$r_dynamic)[3]/2)]],
                                     mahal_metric = sim$mahal_metric,
                                     D2_param = P(sim)$D2_param)
       
@@ -135,10 +117,12 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       
       
       
-      # if (P(sim)$.plots) sim$land # not sure what this is for...
+      if (P(sim)$.plots) sim$land # not sure what this is for...
       
-      sim$Fpop <- extract_Fpop(rFpop=sim$rFpop)
-        
+      sim$Fpop <- extract_Fpop(rFpop=sim$IBM_aoi$r_static$layer.1)
+      
+      sim$num.land.updates <- P(sim)$yrs.to.run / 5 # hard-coding this in for now - clus obj updates every 5 years so run loop for 5 years before checking underlying landase
+      
       # schedule future event(s)
       sim <- scheduleEvent(sim, time(sim), "FLEX", "runSimulation")
       sim <- scheduleEvent(sim, time(sim), "FLEX", "generateOutputs")
@@ -148,16 +132,18 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       EX_real.FEMALE.sim100 <- vector('list', 100)  # if not hard-coded, use this  'P(sim)$iterations' in place of 100
       for(i in 1:100){
         EX_real.FEMALE.sim100[[i]] <- FEMALE_IBM_simulation_same_world(land = sim$land, 
-                                                                       rMove=sim$rMove[[1]],
+                                                                       rMove=sim$IBM_aoi$r_dynamic[[(dim(IBM_aoi$r_dynamic)[3]/2)+1]],
                                                                        fisher = sim$fisher,
                                                                        repro_estimates = sim$repro_CI,
                                                                        Fpop = sim$Fpop,
                                                                        surv_estimates = sim$surv_estimates,
                                                                        maxAgeFemale = P(sim)$maxAgeFemale,
-                                                                       # yrs.to.run = P(sim)$yrs.to.run # removing this and changing it for event scheduler
+                                                                       yrs.to.run = 5, # hard-coding this in for now because need to run for 5 years between landbase updates
                                                                        dist_mov = P(sim)$dist_mov)
-        
       }
+      
+      ## need to think through how to rerun this for future iterations but feeding from output
+      ## need to stitch outputs together (append?) so that newer iterations are running from previous ones
       
       sim$EX_real.FEMALE <- list(sim$w1, 
                                    EX_real.FEMALE.sim100)
@@ -234,7 +220,7 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
   
-  if (!suppliedElsewhere(object = "repro.CI", sim = sim)){
+  if (!suppliedElsewhere(object = "repro_CI", sim = sim)){
     sim$repro_CI <- fread(file.path(Paths[["modulePath"]], 
                                     currentModule(sim), 
                                     "data/repro_CI.csv"))
