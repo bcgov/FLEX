@@ -20,7 +20,6 @@ create_MAHAL_land <- function(rFHzone,
 
   rMahal_list <- list()
   for(i in 1:length(FHzones)){
-    # i=1
     rFHzone_tmp <- rFHzone==FHzones[[i]]
     rFHzone_tmp[rFHzone_tmp<1] <- NA
     rMahal_list[[i]] <- raster::mask(rMahal <= as.numeric(mahal_tmp[i,c("CapD2")]), rFHzone_tmp)
@@ -35,12 +34,12 @@ create_MAHAL_land <- function(rFHzone,
 
   land <- raster2world(rMahal_ST)
 
-  return("land"=land)
+  return(land)
 
 }
 
-land <- create_MAHAL_land(rFHzone = IBM_aoi$r_static[[2]], # 1=Boreal, 2=Sub-boreal moist, 3=Sub-boreal dry, 4= Dry forest
-                          rMahal = IBM_aoi$r_dynamic[[1]], # Mahalanobis distances for NetLogo world, subsequent rasters are 5 at year intervals
-                          mahal_metric = fread(file.path(paste0(getwd(),"/modules/FLEX/"),"data/mahal_metric.csv"), select=c(1:5)),
-                          D2_param = "Max")
+# land <- create_MAHAL_land(rFHzone = IBM_aoi$r_static[[2]], # 1=Boreal, 2=Sub-boreal moist, 3=Sub-boreal dry, 4= Dry forest
+#                           rMahal = IBM_aoi$r_dynamic[[1]], # Mahalanobis distances for NetLogo world, subsequent rasters are 5 at year intervals
+#                           mahal_metric = fread(file.path(paste0(getwd(),"/modules/FLEX/"),"data/mahal_metric.csv"), select=c(1:5)),
+#                           D2_param = "Max")
 
