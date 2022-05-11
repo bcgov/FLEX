@@ -7,7 +7,7 @@ create_MAHAL_land <- function(rFHzone,
   # Raster with mahalanobis distance (D2) values
   # Use mahal_metric to determine which value is our cap for suitable habitat
 
-  mahal_tmp <- mahal_metric %>% select("FHE_zone_num", D2_param)
+  mahal_tmp <- mahal_metric %>% dplyr::select("FHE_zone_num", D2_param)
   if (ncol(mahal_tmp) >2 ) {
   mahal_tmp$CapD2 <- rowSums(mahal_tmp[,2:ncol(mahal_tmp)])
   } else {mahal_tmp$CapD2 <- mahal_tmp[,2]}
@@ -23,7 +23,7 @@ create_MAHAL_land <- function(rFHzone,
     # i=1
     rFHzone_tmp <- rFHzone==FHzones[[i]]
     rFHzone_tmp[rFHzone_tmp<1] <- NA
-    rMahal_list[[i]] <- raster::mask(rMahal <= mahal_tmp[i,c("CapD2")], rFHzone_tmp)
+    rMahal_list[[i]] <- raster::mask(rMahal <= as.numeric(mahal_tmp[i,c("CapD2")]), rFHzone_tmp)
   }
 
   # sum(rMahal_list[[1]]@data@values, na.rm=TRUE)+sum(rMahal_list[[2]]@data@values, na.rm=TRUE)+sum(rMahal_list[[3]]@data@values, na.rm=TRUE)
@@ -44,4 +44,3 @@ land <- create_MAHAL_land(rFHzone = IBM_aoi$r_static[[2]], # 1=Boreal, 2=Sub-bor
                           mahal_metric = fread(file.path(paste0(getwd(),"/modules/FLEX/"),"data/mahal_metric.csv"), select=c(1:5)),
                           D2_param = "Max")
 
-# test commit
