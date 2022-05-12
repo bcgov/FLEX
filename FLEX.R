@@ -37,8 +37,8 @@ defineModule(sim, list(
                     "What is the initial proportion of femlaes to suitable FETAs to start?"),
     defineParameter("maxAgeFemale", "numeric", 9, NA, NA,
                     "What is the maximum age a female can have?"),
-    defineParameter("dist_mov", "numeric", 1.0, NA, NA,
-                    "Distance of movement across landscape per time step"),
+    # defineParameter("dist_mov", "numeric", 1.0, NA, NA,
+    #                 "Distance of movement across landscape per time step"),
     defineParameter("sim_order", "numeric", 2, NA, NA,
                     ""),
     defineParameter("TS", "numeric", 10, NA, NA,
@@ -85,7 +85,7 @@ defineModule(sim, list(
   outputObjects = bindrows(
     createsOutput(objectName = "Fpop", objectClass = "character", 
                   desc = "Describes which population the simulation is running for"),
-    createsOutput(objectName = "fisher", objectClass = "agentMatrix object", 
+    createsOutput(objectName = "fishers", objectClass = "agentMatrix object", 
                   desc = "Describes the fishers (agents) on the land"),
     createsOutput(objectName = "land", objectClass = "worldMatrix object", 
                   desc = "Describes the underlying landscape, 0=unsuitable habitat, 1=suitable FETA"),
@@ -111,7 +111,7 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
                                     D2_param = P(sim)$D2_param)
       
       # create fishers for start of simulation
-      sim$fisher <- set_up_REAL_world_FEMALE(propFemales = P(sim)$propFemales,
+      sim$fishers <- set_up_REAL_world_FEMALE(propFemales = P(sim)$propFemales,
                                          maxAgeFemale = P(sim)$maxAgeFemale,
                                          land = sim$land)
       
@@ -129,25 +129,29 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
     },
     runSimulation = {
       
-      EX_real.FEMALE.sim100 <- vector('list', 100)  # if not hard-coded, use this  'P(sim)$iterations' in place of 100
-      for(i in 1:100){
-        EX_real.FEMALE.sim100[[i]] <- FEMALE_IBM_simulation_same_world(land = sim$land, 
-                                                                       rMove=sim$IBM_aoi$r_dynamic[[(dim(IBM_aoi$r_dynamic)[3]/2)+1]],
-                                                                       fisher = sim$fisher,
-                                                                       repro_estimates = sim$repro_CI,
-                                                                       Fpop = sim$Fpop,
-                                                                       surv_estimates = sim$surv_estimates,
-                                                                       maxAgeFemale = P(sim)$maxAgeFemale,
-                                                                       yrs.to.run = 5, # hard-coding this in for now because need to run for 5 years between landbase updates
-                                                                       dist_mov = P(sim)$dist_mov)
-      }
+      # replicate 100-times, hard-coded but could become a parameter if needed
+      # replicate may be just as slow as a for loop....
+      # land, rMove and fishers will all need to be indexed to update as per yrs.to.run argument (yrs.to.run/clus_yrs = times to run sim)
+      sim$EX_real.FEMALE <- replicate(100, FEMALE_IBM_simulation_same_world(land=sim$land, 
+                                                                            rMove=IBM_aoi$r_dynamic[[(dim(IBM_aoi$r_dynamic)[3]/2+1):(dim(IBM_aoi$r_dynamic)[3])]],
+                                                                            fishers=sim$fishers[[1]],
+                                                                            repro_estimates=sim$repro_estimates,
+                                                                            Fpop=sim$Fpop,
+                                                                            surv_estimates=sim$surv_estimates,
+                                                                            maxAgeFemale=P(sim)$maxAgeFemale,
+                                                                            clus_yrs=P(sim)$clus_yrs),
+                                      simplify=FALSE)
       
-      ## need to think through how to rerun this for future iterations but feeding from output
-      ## need to stitch outputs together (append?) so that newer iterations are running from previous ones
+      ?replicate
       
-      sim$EX_real.FEMALE <- list(sim$w1, 
-                                   EX_real.FEMALE.sim100)
       
+      # Internal error in `df_slice()`: Columns must match the data frame size. # need to rethink this for when runs to 0
+      
+      
+      # sim$EX_real.FEMALE <- list(sim$w1, 
+      #                              EX_real.FEMALE.sim100)
+      #  NEED TO SORT OUT HOW BEST TO RUN THE SIMULATIONS, UPDATE WITH NEWER clusObj and then stich the output together...
+
       # Schedule next event
       sim <- scheduleEvent(sim, time(sim) + 1, "FLEX", "runSimulation")
     },
@@ -227,7 +231,7 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
   }
   
   if (!suppliedElsewhere(object = "mahal_metric", sim = sim)){
-    sim$IBM_aoi <- fread(file.path(Paths[["modulePath"]],
+    sim$mahal_metric <- fread(file.path(Paths[["modulePath"]],
                                    currentModule(sim), 
                                    "data/mahal_metric.csv"))
   }

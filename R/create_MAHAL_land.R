@@ -7,7 +7,7 @@ create_MAHAL_land <- function(rFHzone,
   # Raster with mahalanobis distance (D2) values
   # Use mahal_metric to determine which value is our cap for suitable habitat
 
-  mahal_tmp <- mahal_metric %>% dplyr::select("FHE_zone_num", D2_param)
+  mahal_tmp <- mahal_metric %>% dplyr::select("FHE_zone_num", all_of(D2_param))
   if (ncol(mahal_tmp) >2 ) {
   mahal_tmp$CapD2 <- rowSums(mahal_tmp[,2:ncol(mahal_tmp)])
   } else {mahal_tmp$CapD2 <- mahal_tmp[,2]}

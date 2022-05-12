@@ -1,15 +1,12 @@
 ###--- DISPERSE
 disperse_FEMALE <- function(land,
                             rMove,
-                            fishers,
-                            dist_mov,
-                            out,
-                            torus){
+                            fishers){ # removed dist.move, torus and out - specify where to move so not necessary anymore (default to stay within study area)
+  
   # UPDATED - now fishers checked at the start of the function to determine underlying patch condition
   # NEED TO UPDATE HAVE FISHERS PREFERNTIALLY MOVE TO PATCHES WITH MINIMUM 50% COVER - CAN'T DISPERSE IF UNSUITABLE MOVEMENT
   # Only want fishers without established territories to move
   # Assume female fisher can move ~35 km in a month, and that each pixel is 5.5 km in length or 7.8 km in diameter
-  # For ease of calculations, assume a dist_mov of 1.0 is one pixel
   # This means that a female fisher can move between 5-6 pixels per month or 30-36 pixels in each time step
   # dist_mov relates to the number of cells (not quite right if fisher moving diagonally across a cell but works for our purposes)
 
@@ -41,17 +38,16 @@ disperse_FEMALE <- function(land,
     # 1. check neighbouring cells for suitable habitat and movement habitat values
     # 2. rank and order so that fishers will move first to neighbour with suitable habitat, then to neighbour with high movement habitat
     # 3. move fisher if neighbour is either suitable habitat or movement habitat value > 0.5
-    # currently not considering if neighbour is occupied...does this matter for movement? might need to add in and rank as lower if occupied
 
     # fisher need to disperse to cells with >=0.5 movement habitat, choosing highest
-    neighbour.cells <- as.data.frame(neighbors(mHabitat, disperseInd, nNeighbors=8))
+    neighbour.cells <- as.data.frame(neighbors(mHabitat, disperseInd, nNeighbors = 8))
     neighbour.cells$mHabitat <- of(mHabitat, as.matrix(neighbour.cells %>% select(-id)))
     neighbour.cells$Habitat <- of(land, as.matrix(neighbour.cells %>% select(-id)))
     mHab.neighbour.cells <- neighbour.cells %>% group_by(id) %>%                 # group by id
       mutate(moveTo = case_when(Habitat==1 ~ "SH",                               # create variable of SH (suitable habitat) or MH (movement habitat)
                                 mHabitat >= 0.5 & Habitat==0 ~ "MH")) %>%
       arrange(desc(moveTo), desc(mHabitat), .by_group=TRUE) %>%               # arrange so SH, MH, then NA and within each group by highest movement habitat
-      rowid_to_column() %>% mutate(mHab_ranks = min_rank(rowid))     # rank by habitat variable (SH, MH, NA) and quality of MH (>0.5 acceptable)
+      tibble::rowid_to_column() %>% mutate(mHab_ranks = min_rank(rowid))     # rank by habitat variable (SH, MH, NA) and quality of MH (>0.5 acceptable)
 
     fisher.cells <- as.data.frame(fisher.cells)
     fisher.cells$fisher <- "present"
