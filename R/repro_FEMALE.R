@@ -4,7 +4,7 @@ repro_FEMALE <- function(fishers,
                          Fpop) {
   
   # Random (binomial) selection for which adult females reproduce, based on denning rates confidence intervals
-  # fishers=w1$t0; fishers=tmp$t0; rm(fishers)
+  # Fpop="C"; fishers
   whoFishers <- of(agents = fishers, var = c("who","breed")) # "who" of the fishers before they reproduce
   whoAFFishers <- whoFishers[whoFishers$breed=="adult",]$who
   

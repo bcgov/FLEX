@@ -47,7 +47,7 @@ defineModule(sim, list(
                     "")
     ),
   inputObjects = bindrows( #TODO: JB to complete
-    expectsInput(objectName = "repro_CI", objectClass = "data.table", 
+    expectsInput(objectName = "repro_estimates", objectClass = "data.table", 
                  desc = paste0("Table with the following hearders: ",
                                "Param: mean, sd, L95CI, U95CI",
                                "dr: XXXX",
@@ -87,8 +87,8 @@ defineModule(sim, list(
                   desc = "Describes which population the simulation is running for"),
     createsOutput(objectName = "fishers", objectClass = "agentMatrix object", 
                   desc = "Describes the fishers (agents) on the land"),
-    createsOutput(objectName = "land", objectClass = "worldMatrix object", 
-                  desc = "Describes the underlying landscape, 0=unsuitable habitat, 1=suitable FETA"),
+    createsOutput(objectName = "Mahal_land", objectClass = "list", 
+                  desc = " list of worldMatrix objects that describe the underlying landscape, 0=unsuitable habitat, 1=suitable FETA"),
     createsOutput(objectName = "EX_real.FEMALE", objectClass = "list", 
                   desc = "")
   )
@@ -103,17 +103,23 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       ### check for more detailed object dependencies:
       ### (use `checkObject` or similar)
       
+      sim$num.land.updates <- P(sim)$yrs.to.run / P(sim)$clus_yrs # clus obj updates every 5 years (default)
       
-      # create underlying landbase for start of simulation
-      sim$land <- create_MAHAL_land(rFHzone = sim$IBM_aoi$r_static$layer.2,
-                                    rMahal = sim$IBM_aoi$r_dynamic[[1:(dim(IBM_aoi$r_dynamic)[3]/2)]],
-                                    mahal_metric = sim$mahal_metric,
-                                    D2_param = P(sim)$D2_param)
+      # create underlying landscape for each round of land (i.e., clus objects) updates
+      sim$Mahal_land <- vector('list', sim$num.land.updates)
+      
+      for(i in 1:sim$num.land.updates){ # the number of Mahalanobis land layers from the clus obj
+        
+        sim$Mahal_land[[i]] <- create_MAHAL_land(rFHzone = sim$IBM_aoi$r_static$layer.2,
+                                      rMahal = sim$IBM_aoi$r_dynamic[[i]],
+                                      mahal_metric = sim$mahal_metric,
+                                      D2_param = P(sim)$D2_param)
+      }
       
       # create fishers for start of simulation
       sim$fishers <- set_up_REAL_world_FEMALE(propFemales = P(sim)$propFemales,
                                          maxAgeFemale = P(sim)$maxAgeFemale,
-                                         land = sim$land)
+                                         land = sim$Mahal_land[[1]])
       
       
       
@@ -121,7 +127,6 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       
       sim$Fpop <- extract_Fpop(rFpop=sim$IBM_aoi$r_static$layer.1)
       
-      sim$num.land.updates <- P(sim)$yrs.to.run / 5 # hard-coding this in for now - clus obj updates every 5 years so run loop for 5 years before checking underlying landase
       
       # schedule future event(s)
       sim <- scheduleEvent(sim, time(sim), "FLEX", "runSimulation")
@@ -142,9 +147,7 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
                                                                             clus_yrs=P(sim)$clus_yrs),
                                       simplify=FALSE)
       
-      ?replicate
-      
-      
+
       # Internal error in `df_slice()`: Columns must match the data frame size. # need to rethink this for when runs to 0
       
       
@@ -224,7 +227,7 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
   
-  if (!suppliedElsewhere(object = "repro_CI", sim = sim)){
+  if (!suppliedElsewhere(object = "repro_estimates", sim = sim)){
     sim$repro_CI <- fread(file.path(Paths[["modulePath"]], 
                                     currentModule(sim), 
                                     "data/repro_CI.csv"))

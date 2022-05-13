@@ -12,9 +12,6 @@ create_MAHAL_land <- function(rFHzone,
   mahal_tmp$CapD2 <- rowSums(mahal_tmp[,2:ncol(mahal_tmp)])
   } else {mahal_tmp$CapD2 <- mahal_tmp[,2]}
 
-
-  rMahal <- rMahal[[1]] # use the first (current) Mahal landbase
-
   FHzones <- unique(rFHzone@data@values)
   FHzones <- FHzones[!is.na(FHzones)]
 

@@ -1,9 +1,10 @@
 ###--- SET-UP WORLD bringin in land aoi created previously - for female only IBM
-set_up_REAL_world_FEMALE <- function(propFemales=propFemales, maxAgeFemale=maxAgeFemale, land=land){
-  # propFemales = 0.3
-  # maxAgeFemale = 9
-  # land = land
-   
+set_up_REAL_world_FEMALE <- function(propFemales, 
+                                     maxAgeFemale,
+                                     land,
+                                     repro_estimates,
+                                     Fpop){
+
   # Raster with mahalanobis distance (D2) values
   # Use mahal_metric to determine 
   cells.good.habitat <- sum(land)
@@ -65,6 +66,8 @@ set_up_REAL_world_FEMALE <- function(propFemales=propFemales, maxAgeFemale=maxAg
 
 
 # fishers <- set_up_REAL_world_FEMALE(propFemales = 0.3,
-#                                    maxAgeFemale = 9,
-#                                    land = land)
+#                                     maxAgeFemale = 9,
+#                                     land = land,
+#                                     repro_estimates = repro_estimates,
+#                                     Fpop = "C")
 
