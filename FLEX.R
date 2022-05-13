@@ -116,16 +116,35 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
                                       D2_param = P(sim)$D2_param)
       }
       
+      
+      # Mahal_land <- vector('list', 2)
+      # 
+      # for(i in 1:2){ # the number of Mahalanobis land layers from the clus obj
+      #   
+      #   Mahal_land[[i]] <- create_MAHAL_land(rFHzone = IBM_aoi$r_static$layer.2,
+      #                                            rMahal = IBM_aoi$r_dynamic[[i]],
+      #                                            mahal_metric = fread(file.path(paste0(getwd(),"/modules/FLEX/"),"data/mahal_metric.csv")),
+      #                                            D2_param = c("Max","SD"))
+      # }
+      
+      
       # create fishers for start of simulation
+      sim$Fpop <- extract_Fpop(rFpop=sim$IBM_aoi$r_static$layer.1)
+      
       sim$fishers <- set_up_REAL_world_FEMALE(propFemales = P(sim)$propFemales,
                                          maxAgeFemale = P(sim)$maxAgeFemale,
-                                         land = sim$Mahal_land[[1]])
+                                         land = sim$Mahal_land[[1]],
+                                         Fpop=sim$Fpop,
+                                         repro_estimates = sim$repro_estimates)
       
-      
+      # fishers <- set_up_REAL_world_FEMALE(propFemales = 0.3,
+      #                                     maxAgeFemale = 9,
+      #                                     land = Mahal_land[[1]],
+      #                                     Fpop="C",
+      #                                     repro_estimates = fread(file.path(paste0(getwd(),"/modules/FLEX/"),"data/repro_CI.csv")))
+      # 
       
       if (P(sim)$.plots) sim$land # not sure what this is for...
-      
-      sim$Fpop <- extract_Fpop(rFpop=sim$IBM_aoi$r_static$layer.1)
       
       
       # schedule future event(s)

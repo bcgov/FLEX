@@ -38,5 +38,5 @@ create_MAHAL_land <- function(rFHzone,
 # land <- create_MAHAL_land(rFHzone = IBM_aoi$r_static[[2]], # 1=Boreal, 2=Sub-boreal moist, 3=Sub-boreal dry, 4= Dry forest
 #                           rMahal = IBM_aoi$r_dynamic[[1]], # Mahalanobis distances for NetLogo world, subsequent rasters are 5 at year intervals
 #                           mahal_metric = fread(file.path(paste0(getwd(),"/modules/FLEX/"),"data/mahal_metric.csv"), select=c(1:5)),
-#                           D2_param = "Max")
+#                           D2_param = c("Max","SD"))
 
