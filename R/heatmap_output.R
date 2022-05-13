@@ -53,7 +53,6 @@ heatmap_output <- function(sim_out,
     ftmp.sf <- st_as_sf(ftmp, coords = c("pxcor", "pycor"))
     ftmp.sfp <- st_buffer(ftmp.sf, dist=.1)
     
-    # r_list[[i]] <- rasterize(ftmp.sfp, r, field="Fisher", fun=rFun, background=0) # interim work around until terra and new raster package uploaded
     r_list[[i]] <- rasterize(ftmp.sfp, r, field="Fisher", background=0) # interim work around until terra and new raster package uploaded
   }
   

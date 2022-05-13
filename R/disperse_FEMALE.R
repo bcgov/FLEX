@@ -10,7 +10,16 @@ disperse_FEMALE <- function(land,
   # This means that a female fisher can move between 5-6 pixels per month or 30-36 pixels in each time step
   # dist_mov relates to the number of cells (not quite right if fisher moving diagonally across a cell but works for our purposes)
 
-  mHabitat <- raster2world(rMove[[1]]) # convert the underlying movement habitat layer to a NetLogo WorldMatrix object
+  # deals with inconsistencies between potential rMahal and rMove inputs
+  if(dim(rMove)[3]>1){
+    rMove <- rMove[[1]]
+  }
+  
+  if(length(land)>1){
+    land <- land[[1]]
+  }
+  
+  mHabitat <- raster2world(rMove) # convert the underlying movement habitat layer to a NetLogo WorldMatrix object
   # if rMove is a RasterStack, defaults to first layer - this works for illustration purposes but will need to be conscious of it with dynamic simulations
 
   # fishers=tApr
@@ -29,6 +38,8 @@ disperse_FEMALE <- function(land,
   disperseInd <- turtle(fishers, who = whoDFishers) # fishers who are dispersing (i.e., kits)
 
   # only run if fishers
+  # if (length(DT) > 1){ # might have to change to lenght...the issue of dealing with 0s in the WorldArray matrix
+    
   if(NLcount(disperseInd)!=0){
 
     # The landscape is wrapped (torus = TRUE), meaning dispersing fishers re-enter
@@ -40,7 +51,7 @@ disperse_FEMALE <- function(land,
     # 3. move fisher if neighbour is either suitable habitat or movement habitat value > 0.5
 
     # fisher need to disperse to cells with >=0.5 movement habitat, choosing highest
-    neighbour.cells <- as.data.frame(neighbors(mHabitat, disperseInd, nNeighbors = 8))
+    neighbour.cells <- as.data.frame(NetLogoR::neighbors(mHabitat, disperseInd, nNeighbors = 8))
     neighbour.cells$mHabitat <- of(mHabitat, as.matrix(neighbour.cells %>% select(-id)))
     neighbour.cells$Habitat <- of(land, as.matrix(neighbour.cells %>% select(-id)))
     mHab.neighbour.cells <- neighbour.cells %>% group_by(id) %>%                 # group by id

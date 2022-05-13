@@ -89,8 +89,10 @@ defineModule(sim, list(
                   desc = "Describes the fishers (agents) on the land"),
     createsOutput(objectName = "Mahal_land", objectClass = "list", 
                   desc = " list of worldMatrix objects that describe the underlying landscape, 0=unsuitable habitat, 1=suitable FETA"),
-    createsOutput(objectName = "EX_real.FEMALE", objectClass = "list", 
-                  desc = "")
+    createsOutput(objectName = "FEMALE_IBM_initial", objectClass = "list", 
+                  desc = "list of worldArray objects that describe the female fisher population after the inital simulation run"),
+    createsOutput(objectName = "FEMALE_IBM_dynamic", objectClass = "list", 
+                  desc = "list of worldArray objects that describe the female fisher population throughout the dynamic simulation run (i.e., updated landscape)")
   )
 ))
 
@@ -120,7 +122,7 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       # Mahal_land <- vector('list', 2)
       # 
       # for(i in 1:2){ # the number of Mahalanobis land layers from the clus obj
-      #   
+      # 
       #   Mahal_land[[i]] <- create_MAHAL_land(rFHzone = IBM_aoi$r_static$layer.2,
       #                                            rMahal = IBM_aoi$r_dynamic[[i]],
       #                                            mahal_metric = fread(file.path(paste0(getwd(),"/modules/FLEX/"),"data/mahal_metric.csv")),
@@ -148,44 +150,76 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       
       
       # schedule future event(s)
-      sim <- scheduleEvent(sim, time(sim), "FLEX", "runSimulation")
+      sim <- scheduleEvent(sim, time(sim), "FLEX", "initialSimulation")
+      sim <- scheduleEvent(sim, time(sim), "FLEX", "dynamicSimulation")
       sim <- scheduleEvent(sim, time(sim), "FLEX", "generateOutputs")
     },
-    runSimulation = {
-      
-      # replicate 100-times, hard-coded but could become a parameter if needed
+    initialSimulation = {
       # replicate may be just as slow as a for loop....
-      # land, rMove and fishers will all need to be indexed to update as per yrs.to.run argument (yrs.to.run/clus_yrs = times to run sim)
-      sim$EX_real.FEMALE <- replicate(100, FEMALE_IBM_simulation_same_world(land=sim$land, 
-                                                                            rMove=IBM_aoi$r_dynamic[[(dim(IBM_aoi$r_dynamic)[3]/2+1):(dim(IBM_aoi$r_dynamic)[3])]],
-                                                                            fishers=sim$fishers[[1]],
-                                                                            repro_estimates=sim$repro_estimates,
-                                                                            Fpop=sim$Fpop,
-                                                                            surv_estimates=sim$surv_estimates,
-                                                                            maxAgeFemale=P(sim)$maxAgeFemale,
-                                                                            clus_yrs=P(sim)$clus_yrs),
+      sim$FEMALE_IBM_initial <- replicate(P(sim)$iterations, 
+                                      FEMALE_IBM_simulation_same_world(land=sim$Mahal_land, 
+                                                                       rMove=sim$IBM_aoi$r_dynamic[[(dim(IBM_aoi$r_dynamic)[3]/2+1):(dim(IBM_aoi$r_dynamic)[3])]],
+                                                                       fishers=sim$fishers,
+                                                                       repro_estimates=sim$repro_estimates,
+                                                                       Fpop=sim$Fpop,
+                                                                       surv_estimates=sim$surv_estimates,
+                                                                       maxAgeFemale=P(sim)$maxAgeFemale,
+                                                                       clus_yrs=P(sim)$clus_yrs),
                                       simplify=FALSE)
       
-
-      # Internal error in `df_slice()`: Columns must match the data frame size. # need to rethink this for when runs to 0
       
+      # FEMALE_IBM_initial <- replicate(5,
+      #                                 FEMALE_IBM_simulation_same_world(land=Mahal_land, 
+      #                                                                  rMove=IBM_aoi$r_dynamic[[(dim(IBM_aoi$r_dynamic)[3]/2+1):(dim(IBM_aoi$r_dynamic)[3])]],
+      #                                                                  fishers=fishers,
+      #                                                                  repro_estimates=repro_estimates,
+      #                                                                  Fpop=Fpop,
+      #                                                                  surv_estimates=surv_estimates,
+      #                                                                  maxAgeFemale=9,
+      #                                                                  clus_yrs=5),
+      #                                 simplify=FALSE)
       
-      # sim$EX_real.FEMALE <- list(sim$w1, 
-      #                              EX_real.FEMALE.sim100)
-      #  NEED TO SORT OUT HOW BEST TO RUN THE SIMULATIONS, UPDATE WITH NEWER clusObj and then stich the output together...
-
       # Schedule next event
-      sim <- scheduleEvent(sim, time(sim) + 1, "FLEX", "runSimulation")
+      sim <- scheduleEvent(sim, time(sim) + 1, "FLEX", "initialSimulation")
     },
+    
+    dynamicSimulation = {
+      
+      # land, rMove and fishers will all need to be indexed to update as per yrs.to.run argument (yrs.to.run/clus_yrs = times to run sim)
+      sim$sim$FEMALE_IBM_dynamic <- vector('list', sim$num.land.updates)
+      
+      for(i in 1:sim$num.land.updates){
+        sim$FEMALE_IBM_dynamic[[i]] <- replicate(P(sim)$iterations,
+                                                 FEMALE_IBM_simulation_same_world(land=sim$Mahal_land[[i]], 
+                                                                                  rMove=IBM_aoi$r_dynamic[[(dim(IBM_aoi$r_dynamic)[3]/2+1):(dim(IBM_aoi$r_dynamic)[3])]][[i]],
+                                                                                  fishers=sim$FEMALE_IBM_initial[[i]][[P(sim)$clus_yrs]],
+                                                                                  repro_estimates=sim$repro_estimates,
+                                                                                  Fpop=sim$Fpop,
+                                                                                  surv_estimates=sim$surv_estimates,
+                                                                                  maxAgeFemale=P(sim)$maxAgeFemale,
+                                                                                  clus_yrs=P(sim)$clus_yrs),
+                                                 simplify=FALSE)
+        
+      }
+      
+      
+      # Schedule next event
+      sim <- scheduleEvent(sim, time(sim) + 1, "FLEX", "dynamicSimulation")
+    },
+    
     generateOutputs = {
-      sim$EX_real <- ABM_fig_1sim(sim_out = sim$EX_real.FEMALE, 
+      
+      # will need to add the two simulations together...
+      sim$FEMALE_IBM_initial
+      
+      sim$FEMALE_output <- ABM_fig_1sim(sim_out = sim$EX_real.FEMALE, 
                                     numsims = P(sim)$iterations, 
                                     yrs_sim = P(sim)$yrs.to.run, 
                                     Fpop = sim$Fpop)
       
-      if (P(sim)$.plots) sim$EX_real
+      if (P(sim)$.plots) sim$FEMALE_output
       
-      sim$EX_real_heatmap <- heatmap_output(sim_out = sim$EX_real.FEMALE, 
+      sim$EX_real_heatmap <- heatmap_output(sim_out = sim$FEMALE_output, 
                                               sim_order = P(sim)$sim_order, 
                                               numsims = P(sim)$iterations, 
                                               yrs_sim = P(sim)$yrs.to.run, 
@@ -247,7 +281,7 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
   
   if (!suppliedElsewhere(object = "repro_estimates", sim = sim)){
-    sim$repro_CI <- fread(file.path(Paths[["modulePath"]], 
+    sim$repro_estimates <- fread(file.path(Paths[["modulePath"]], 
                                     currentModule(sim), 
                                     "data/repro_CI.csv"))
   }

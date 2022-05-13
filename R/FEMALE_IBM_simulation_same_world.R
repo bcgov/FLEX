@@ -10,9 +10,13 @@ FEMALE_IBM_simulation_same_world <- function(land,
                                              # yrs.to.run,
                                              clus_yrs){ # run for as many years between updated clus objects (default is 5)
 
-  tApr <- fishers
-  
+  # deals with inconsistencies between potential fisher inputs
+  if(class(fishers)=="list"){
+    tApr <- fishers[[1]]
+  } else {tApr <- fishers}
+
   FEMALE_same_world <- vector('list', clus_yrs)
+  
   for(tcount in 1:clus_yrs){
     # tApril	April	Establish / maintain territory & reproduce & scent territory
     # 	Females ≥ 0.5 years without established territories disperse (up to 30 FETAs / 6 months of movement)
@@ -70,5 +74,5 @@ FEMALE_IBM_simulation_same_world <- function(land,
 
 
 # rMove <- IBM_aoi$r_dynamic[[(dim(IBM_aoi$r_dynamic)[3]/2+1):(dim(IBM_aoi$r_dynamic)[3])]]
-# fishers <- FEMALE_IBM_simulation_same_world(land=land ,rMove=rMove[[1]], fishers=fishers, repro_estimates = repro_estimates, Fpop=Fpop,
+# fishers <- FEMALE_IBM_simulation_same_world(land=land ,rMove=rMove, fishers=fishers, repro_estimates = repro_estimates, Fpop=Fpop,
 #                                             surv_estimates = surv_estimates, maxAgeFemale = 9,clus_yrs=5)
