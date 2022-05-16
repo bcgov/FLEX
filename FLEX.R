@@ -83,16 +83,18 @@ defineModule(sim, list(
                  sourceURL = NA),
   ),
   outputObjects = bindrows(
+    createsOutput(objectName = "num.land.updates", objectClass = "numeric", 
+                  desc = "The number of times the underlying land needs to update (yrs.to.run / clus_years"),
     createsOutput(objectName = "Fpop", objectClass = "character", 
                   desc = "Describes which population the simulation is running for"),
     createsOutput(objectName = "fishers", objectClass = "agentMatrix object", 
                   desc = "Describes the fishers (agents) on the land"),
+    createsOutput(objectName = "fishers_index", objectClass = "list", 
+                  desc = "A list of length iterations describing the fishers (agents) on the land"),
     createsOutput(objectName = "Mahal_land", objectClass = "list", 
                   desc = " list of worldMatrix objects that describe the underlying landscape, 0=unsuitable habitat, 1=suitable FETA"),
-    createsOutput(objectName = "FEMALE_IBM_initial", objectClass = "list", 
-                  desc = "list of worldArray objects that describe the female fisher population after the inital simulation run"),
     createsOutput(objectName = "FEMALE_IBM_dynamic", objectClass = "list", 
-                  desc = "list of worldArray objects that describe the female fisher population throughout the dynamic simulation run (i.e., updated landscape)")
+                  desc = "list of worldArray objects that describe the female fisher population using updated landscapes")
   )
 ))
 
@@ -139,6 +141,13 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
                                          Fpop=sim$Fpop,
                                          repro_estimates = sim$repro_estimates)
       
+      sim$fishers_index <- vector('list', P(sim)$iterations)
+      
+      # duplicate to have the same starting point for all iterations
+      for(i in 1:P(sim)$iterations){
+      sim$fishers_index[[i]]<- sim$fishers
+      }
+      
       # fishers <- set_up_REAL_world_FEMALE(propFemales = 0.3,
       #                                     maxAgeFemale = 9,
       #                                     land = Mahal_land[[1]],
@@ -150,58 +159,30 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       
       
       # schedule future event(s)
-      sim <- scheduleEvent(sim, time(sim), "FLEX", "initialSimulation")
       sim <- scheduleEvent(sim, time(sim), "FLEX", "dynamicSimulation")
       sim <- scheduleEvent(sim, time(sim), "FLEX", "generateOutputs")
     },
-    initialSimulation = {
-      # replicate may be just as slow as a for loop....
-      sim$FEMALE_IBM_initial <- replicate(P(sim)$iterations, 
-                                      FEMALE_IBM_simulation_same_world(land=sim$Mahal_land, 
-                                                                       rMove=sim$IBM_aoi$r_dynamic[[(dim(IBM_aoi$r_dynamic)[3]/2+1):(dim(IBM_aoi$r_dynamic)[3])]],
-                                                                       fishers=sim$fishers,
-                                                                       repro_estimates=sim$repro_estimates,
-                                                                       Fpop=sim$Fpop,
-                                                                       surv_estimates=sim$surv_estimates,
-                                                                       maxAgeFemale=P(sim)$maxAgeFemale,
-                                                                       clus_yrs=P(sim)$clus_yrs),
-                                      simplify=FALSE)
-      
-      
-      # FEMALE_IBM_initial <- replicate(5,
-      #                                 FEMALE_IBM_simulation_same_world(land=Mahal_land, 
-      #                                                                  rMove=IBM_aoi$r_dynamic[[(dim(IBM_aoi$r_dynamic)[3]/2+1):(dim(IBM_aoi$r_dynamic)[3])]],
-      #                                                                  fishers=fishers,
-      #                                                                  repro_estimates=repro_estimates,
-      #                                                                  Fpop=Fpop,
-      #                                                                  surv_estimates=surv_estimates,
-      #                                                                  maxAgeFemale=9,
-      #                                                                  clus_yrs=5),
-      #                                 simplify=FALSE)
-      
-      # Schedule next event
-      sim <- scheduleEvent(sim, time(sim) + 1, "FLEX", "initialSimulation")
-    },
-    
+   
     dynamicSimulation = {
       
       # land, rMove and fishers will all need to be indexed to update as per yrs.to.run argument (yrs.to.run/clus_yrs = times to run sim)
-      sim$sim$FEMALE_IBM_dynamic <- vector('list', sim$num.land.updates)
+      # sim$num.land.updates <- P(sim)$yrs.to.run / P(sim)$clus_yrs # clus obj updates every 5 years (default)
       
-      for(i in 1:sim$num.land.updates){
-        sim$FEMALE_IBM_dynamic[[i]] <- replicate(P(sim)$iterations,
-                                                 FEMALE_IBM_simulation_same_world(land=sim$Mahal_land[[i]], 
-                                                                                  rMove=IBM_aoi$r_dynamic[[(dim(IBM_aoi$r_dynamic)[3]/2+1):(dim(IBM_aoi$r_dynamic)[3])]][[i]],
-                                                                                  fishers=sim$FEMALE_IBM_initial[[i]][[P(sim)$clus_yrs]],
-                                                                                  repro_estimates=sim$repro_estimates,
-                                                                                  Fpop=sim$Fpop,
-                                                                                  surv_estimates=sim$surv_estimates,
-                                                                                  maxAgeFemale=P(sim)$maxAgeFemale,
-                                                                                  clus_yrs=P(sim)$clus_yrs),
-                                                 simplify=FALSE)
-        
+      sim$FEMALE_IBM_dynamic <- vector('list', sim$num.land.updates)
+      
+      for(dy in 1:sim$num.land.updates){
+        for(i in 1:P(sim)$iterations){
+          sim$FEMALE_IBM_dynamic[[dy]][[i]] <- FEMALE_IBM_simulation_same_world(land=sim$Mahal_land[[dy]], 
+                                                                                rMove=sim$IBM_aoi$r_dynamic[[(dim(sim$IBM_aoi$r_dynamic)[3]/2+1):(dim(sim$IBM_aoi$r_dynamic)[3])]][[dy]],
+                                                                                fishers=sim$fishers_index[[i]],
+                                                                                repro_estimates=sim$repro_estimates,
+                                                                                Fpop=sim$Fpop,
+                                                                                surv_estimates=sim$surv_estimates,
+                                                                                maxAgeFemale=P(sim)$maxAgeFemale,
+                                                                                clus_yrs=P(sim)$clus_yrs)
+          
+        }
       }
-      
       
       # Schedule next event
       sim <- scheduleEvent(sim, time(sim) + 1, "FLEX", "dynamicSimulation")
