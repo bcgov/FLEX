@@ -14,7 +14,8 @@ disperse_FEMALE <- function(land,
   if(dim(rMove)[3]>1){
     rMove <- rMove[[1]]
   }
-  
+
+  # now a list of World Array objects (not a raster stack)
   if(length(land)>1){
     land <- land[[1]]
   }

@@ -4,15 +4,16 @@ FEMALE_IBM_simulation_same_world <- function(land,
                                              fishers,               # import world
                                              rMove,
                                              repro_estimates,
-                                             Fpop,             # reproduction
-                                             surv_estimates,   # survive
-                                             maxAgeFemale,     # disperse
+                                             Fpop,           
+                                             surv_estimates, 
+                                             clus_yrs,
                                              # yrs.to.run,
-                                             clus_yrs){ # run for as many years between updated clus objects (default is 5)
+                                             maxAgeFemale){ # run for as many years between updated clus objects (default is 5)
 
   # deals with inconsistencies between potential fisher inputs
   if(class(fishers)=="list"){
-    tApr <- fishers[[1]]
+    last.iteration <- length(fishers)
+    tApr <- fishers[[last.iteration]]
   } else {tApr <- fishers}
 
   FEMALE_same_world <- vector('list', clus_yrs)
@@ -65,7 +66,7 @@ FEMALE_IBM_simulation_same_world <- function(land,
     
     print(NLcount(tOct))
     FEMALE_same_world[[tcount]] <- tOct
-    
+
     tApr <- tOct
     }
   

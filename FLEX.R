@@ -29,8 +29,8 @@ defineModule(sim, list(
                     "Should the simulation save output plots?"),
     defineParameter(".useCache", "logical", FALSE, NA, NA,
                     "Should caching of events or module be used?"),
-    # defineParameter("iterations", "numeric", 100, NA, NA,               # hard coding it in for 100 simulations - makes it easier for output
-    #                 "How many iterations or replicates should be run?"),
+    defineParameter("iterations", "numeric", 100, NA, NA,               # hard coding it in for 100 simulations - makes it easier for output
+                    "How many iterations or replicates should be run?"),
     defineParameter("yrs.to.run", "numeric", 10, NA, NA,
                     "How many years should the simulation run for?"),
     defineParameter("propFemales", "numeric", 0.3, NA, NA,
@@ -76,10 +76,11 @@ defineModule(sim, list(
                                "Taken from Rich Weir's Mahalanobis distance analysis"), 
                  sourceURL = NA),
     expectsInput(objectName = "IBM_aoi", objectClass = "list", 
-                 desc = paste0("list containing two raster stacks: dynamic, static",
-                               "dynamic (raster stacks): Mahalanobis distance values; movement values",
-                               "raster stacks are clusObjects, updated every  5 years",
-                               "static: Fisher population (1=Boreal, 2=Columbian); Fisher Habitat Zone (1:4, as above)"),  
+                 desc = paste0("list containing 4 raster stacks: rMahal, rMove, rFpop, rFHzone",
+                               "rMahal (raster stacks): Mahalanobis distance values; updated once every clus_yrs",
+                               "rMove (raster stacks): movement values; updated once every clus_yrs",
+                               "rFpop: Fisher population (1=Boreal, 2=Columbian); static",
+                               "rFHzone: Fisher Habitat Zone (1:4, as above); static"),  
                  sourceURL = NA),
   ),
   outputObjects = bindrows(
@@ -114,8 +115,8 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       
       for(i in 1:sim$num.land.updates){ # the number of Mahalanobis land layers from the clus obj
         
-        sim$Mahal_land[[i]] <- create_MAHAL_land(rFHzone = sim$IBM_aoi$r_static$layer.2,
-                                      rMahal = sim$IBM_aoi$r_dynamic[[i]],
+        sim$Mahal_land[[i]] <- create_MAHAL_land(rFHzone = sim$IBM_aoi$rFHzone,
+                                      rMahal = sim$IBM_aoi$rMahal[[i]],
                                       mahal_metric = sim$mahal_metric,
                                       D2_param = P(sim)$D2_param)
       }
@@ -125,36 +126,43 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       # 
       # for(i in 1:2){ # the number of Mahalanobis land layers from the clus obj
       # 
-      #   Mahal_land[[i]] <- create_MAHAL_land(rFHzone = IBM_aoi$r_static$layer.2,
-      #                                            rMahal = IBM_aoi$r_dynamic[[i]],
+      #   Mahal_land[[i]] <- create_MAHAL_land(rFHzone = IBM_aoi$rFHzone,
+      #                                            rMahal = IBM_aoi$rMahal[[i]],
       #                                            mahal_metric = fread(file.path(paste0(getwd(),"/modules/FLEX/"),"data/mahal_metric.csv")),
       #                                            D2_param = c("Max","SD"))
       # }
       
       
       # create fishers for start of simulation
-      sim$Fpop <- extract_Fpop(rFpop=sim$IBM_aoi$r_static$layer.1)
+      sim$Fpop <- extract_Fpop(rFpop=sim$IBM_aoi$rFpop)
+      # Fpop <- extract_Fpop(rFpop=IBM_aoi$rFpop)
       
       sim$fishers <- set_up_REAL_world_FEMALE(propFemales = P(sim)$propFemales,
                                          maxAgeFemale = P(sim)$maxAgeFemale,
                                          land = sim$Mahal_land[[1]],
                                          Fpop=sim$Fpop,
                                          repro_estimates = sim$repro_estimates)
-      
+
       sim$fishers_index <- vector('list', P(sim)$iterations)
       
       # duplicate to have the same starting point for all iterations
       for(i in 1:P(sim)$iterations){
-      sim$fishers_index[[i]]<- sim$fishers
+        sim$fishers_index[[i]]<- sim$fishers
       }
       
       # fishers <- set_up_REAL_world_FEMALE(propFemales = 0.3,
-      #                                     maxAgeFemale = 9,
-      #                                     land = Mahal_land[[1]],
-      #                                     Fpop="C",
-      #                                     repro_estimates = fread(file.path(paste0(getwd(),"/modules/FLEX/"),"data/repro_CI.csv")))
+      #                                         maxAgeFemale = 9,
+      #                                         land = Mahal_land[[1]],
+      #                                         Fpop=Fpop,
+      #                                         repro_estimates=repro_estimates)
       # 
+      # fishers_index <- vector('list', 10)
+      # 
+      # for(i in 1:10){
+      #   fishers_index[[i]]<- fishers
+      # }
       
+   
       if (P(sim)$.plots) sim$land # not sure what this is for...
       
       
@@ -168,21 +176,38 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       # land, rMove and fishers will all need to be indexed to update as per yrs.to.run argument (yrs.to.run/clus_yrs = times to run sim)
       # sim$num.land.updates <- P(sim)$yrs.to.run / P(sim)$clus_yrs # clus obj updates every 5 years (default)
       
-      sim$FEMALE_IBM_dynamic <- vector('list', sim$num.land.updates)
+
+      # for each simulation
+      # 1) start with same base / scenario start
+      # 2) run for 1 run of clus_yrs with same landscape
+      # 4) do for 100 fisher objects
+      # 5) create output as FLEX object
+      # 5) have the FLEX object be the same object that can then be exported to be part of CLUS
       
-      for(dy in 1:sim$num.land.updates){
-        for(i in 1:P(sim)$iterations){
-          sim$FEMALE_IBM_dynamic[[dy]][[i]] <- FEMALE_IBM_simulation_same_world(land=sim$Mahal_land[[dy]], 
-                                                                                rMove=sim$IBM_aoi$r_dynamic[[(dim(sim$IBM_aoi$r_dynamic)[3]/2+1):(dim(sim$IBM_aoi$r_dynamic)[3])]][[dy]],
-                                                                                fishers=sim$fishers_index[[i]],
-                                                                                repro_estimates=sim$repro_estimates,
-                                                                                Fpop=sim$Fpop,
-                                                                                surv_estimates=sim$surv_estimates,
-                                                                                maxAgeFemale=P(sim)$maxAgeFemale,
-                                                                                clus_yrs=P(sim)$clus_yrs)
-          
-        }
+      sim$fishers_output <- vector('list', P(sim)$iterations)
+
+      for(i in 1:P(sim)$iterations){
+      fishers_output[[i]] <- FEMALE_IBM_simulation_same_world(land=sim$Mahal_land,
+                                                                       rMove=sim$IBM_aoi$rMove,
+                                                                       fishers=sim$fishers_index[[i]],
+                                                                       repro_estimates=sim$repro_estimates,
+                                                                       Fpop=sim$Fpop,
+                                                                       surv_estimates=sim$surv_estimates,
+                                                                       maxAgeFemale=P(sim)$maxAgeFemale,
+                                                                       clus_yrs=P(sim)$clus_yrs)
       }
+      
+      # fishers_output <- vector('list', 10)
+      # for(i in 1:10){
+      #   fishers_output[[i]] <- FEMALE_IBM_simulation_same_world(land=Mahal_land,
+      #                                                           rMove=IBM_aoi$rMove,
+      #                                                           fishers=fishers_index[[i]],
+      #                                                           repro_estimates=repro_estimates,
+      #                                                           Fpop=Fpop,
+      #                                                           surv_estimates=surv_estimates,
+      #                                                           maxAgeFemale=9,
+      #                                                           clus_yrs=5)
+      # }
       
       # Schedule next event
       sim <- scheduleEvent(sim, time(sim) + 1, "FLEX", "dynamicSimulation")
@@ -191,22 +216,26 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
     generateOutputs = {
       
       # will need to add the two simulations together...
-      sim$FEMALE_IBM_initial
+
+      sim$FEMALE_output <- sim_output(sim_out = sim$fishers_output, 
+                                      iterations = P(sim)$iterations, 
+                                      clus_yrs = P(sim)$clus_yrs)
       
-      sim$FEMALE_output <- ABM_fig_1sim(sim_out = sim$EX_real.FEMALE, 
-                                    numsims = P(sim)$iterations, 
-                                    yrs_sim = P(sim)$yrs.to.run, 
-                                    Fpop = sim$Fpop)
+      
+      FEMALE_output <- sim_output(sim_out = fishers_output, 
+                                  iterations = 10, 
+                                  clus_yrs = 5)
       
       if (P(sim)$.plots) sim$FEMALE_output
       
-      sim$EX_real_heatmap <- heatmap_output(sim_out = sim$FEMALE_output, 
-                                              sim_order = P(sim)$sim_order, 
-                                              numsims = P(sim)$iterations, 
-                                              yrs_sim = P(sim)$yrs.to.run, 
-                                              TS = P(sim)$TS,
-                                              rextent = sim$rFpop,
-                                              name_out = P(sim)$name_out)
+      # sim$EX_real_heatmap <- heatmap_output(sim_out = sim$fishers_output, 
+      #                                         # sim_order = P(sim)$sim_order, 
+      #                                         numsims = P(sim)$iterations, 
+      #                                         yrs_sim = P(sim)$yrs.to.run, 
+      #                                         TS = P(sim)$TS,
+      # propFemales = P(sim)$propFemales
+      #                                         rextent = sim$rFpop,
+      #                                         name_out = P(sim)$name_out)
 
       if (P(sim)$.plots){
         

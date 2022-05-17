@@ -8,33 +8,28 @@
 # the mean and se relate to the number of pixels (i.e., territories) selected per simulation
 
 heatmap_output <- function(sim_out, 
-                           sim_order, 
-                           numsims, 
-                           yrs_sim, 
+                           iterations, 
+                           clus_yrs, 
                            TS, 
-                           name_out,
+                           propFemales,
                            rextent){
-  # sim_out=C.w1_real.FEMALE; sim_order=2; numsims=100; yrs_sim=10; TS=12; name_out="QTSA_ex2"
-  # scenario1 <- canBex.FEMALE[[1]]
-  # IBM_aoi$canBex_raster
-  # sim_out=scenario1; sim_order=2; numsims=100; yrs_sim=10; TS=11; name_out="canBex1";rextent=IBM_aoi$canBex_raster[[1]]
+  # sim_out = fishers_output;iterations = 10;clus_yrs = 5; TS = 5; rextent = Mahal_land[[1]]; propFemales=0.3
 
-  TS_full=paste0("TimeStep_",TS)
+  TS_full=paste0("TimeStep_",str_pad(TS,2,pad="0"))
   
   # find out how many runs had at least one female adult fisher alive at end)
-  tmp <- sim_output(sim_out=sim_out, sim=sim_order, numsims=numsims, yrs_sim=yrs_sim)
+  tmp <- sim_output(sim_out=sim_out, iterations=iterations, clus_yrs=clus_yrs)
   
-  fishers_to_start <- tmp %>% filter(TimeStep=="TimeStep_01") %>% summarise(numAF=mean(Count))
+  # fishers_to_start <- round(tmp %>% filter(TimeStep=="TimeStep_01") %>% summarise(numAF=mean(Count))) # average fishers at 1 year
   
   Nozero.runs <- tmp %>% filter(TimeStep==TS_full) %>%
-    group_by(Sim) %>%
     filter(Count!=0)
   
   tmp2 <- Nozero.runs %>% dplyr::select(Run)
   nozerosims <- tmp2$Run
   
   # set extent of raster the same as extent of initial world
-  rw <- world2raster(sim_out[[1]]$land)
+  rw <- world2raster(rextent)
   
   r <- raster()
   r <- setExtent(r, rw, keepres=TRUE)
@@ -44,11 +39,11 @@ heatmap_output <- function(sim_out,
   # for simulations where at least one fisher survived
   for(i in 1:length(nozerosims)){
     # i=1
-    ftmp1 <- sim_out[[sim_order]][[nozerosims[i]]][[TS]]
+    ftmp1 <- sim_out[[nozerosims[i]]][[TS]]
     whoEAF <- ftmp1[ftmp1$breed=="adult" & ftmp1$disperse=="E",]$who
     EAFind <- turtle(ftmp1, who = whoEAF) # fishers who are dispersing (i.e., kits)
     
-    ftmp <- as.data.frame(patchHere(sim_out[[1]]$land, EAFind))
+    ftmp <- as.data.frame(patchHere(rextent, EAFind))
     ftmp$Fisher <- 1
     ftmp.sf <- st_as_sf(ftmp, coords = c("pxcor", "pycor"))
     ftmp.sfp <- st_buffer(ftmp.sf, dist=.1)
@@ -72,7 +67,7 @@ heatmap_output <- function(sim_out,
   r_stackApply <- stackApply(r_stack, indices=1, fun=sum)
   
   extent(r_stackApply) <- extent(rextent)
-  writeRaster(r_stackApply, file=paste0("out/",dir_name,"/rSim_",name_out,"_",round(sim_out[[sim_order-3]]$actual.prop.hab*100),"hab.tif"), bylayer=TRUE, overwrite=TRUE)
+  # writeRaster(r_stackApply, file=paste0("out/",dir_name,"/rSim_",name_out,"_",round(sim_out[[sim_order-3]]$actual.prop.hab*100),"hab.tif"), bylayer=TRUE, overwrite=TRUE)
   
   # Fisher_Nmean <- mean(r_stackApply@data@values[r_stackApply@data@values>1])
   Fisher_Nmean <- mean(r_stackApply@data@values)
@@ -80,15 +75,16 @@ heatmap_output <- function(sim_out,
   # Fisher_Nse <- se(r_stackApply@data@values[r_stackApply@data@values>1])
   Fisher_Nse <- se(r_stackApply@data@values)
   
-  suitable_habitat <- sum(sim_out[[1]]$land)
-  total_habitat <- dim(sim_out[[1]]$land)[1]*dim(sim_out[[1]]$land)[2]
+  suitable_habitat <- sum(rextent)
+  round(suitable_habitat*0.3) # number of fisher started with
+  total_habitat <- dim(rextent)[1]*dim(rextent)[2]
   
   mtext_left <- floor(r_stackApply@extent@xmin) # to get legend to display at left extent of map
   
-  Cairo(file=paste0("out/rHeatmap_",name_out,"_hab.PNG"), type="png", width=2200, height=2000,pointsize=15,bg="white",dpi=300)
+  Cairo(file=paste0("out/rHeatmap_Year",TS,"_hab.PNG"), type="png", width=2200, height=2000,pointsize=15,bg="white",dpi=300)
   
   plot(r_stackApply, oma=c(2, 3, 5, 2))
-  mytitle = paste0("Estimated Fisher Territories over ",numsims," Simulations")
+  mytitle = paste0("Estimated Fisher Territories over ",iterations," Simulations")
   mysubtitle1 = paste0("Starting with ",fishers_to_start$numAF," fishers and ",round(suitable_habitat/total_habitat*100),"% habitat")
   # mysubtitle2 = paste0("predicted ",round(Fisher_Nmean)," \u00B1 ",round(Fisher_Nse)," (mean \u00B1 1 SE) established fisher territories after ",yrs_sim," years.")
   mysubtitle2 = paste0("predicted ",Fpredicted," established fisher female territories after ",yrs_sim," years.")
