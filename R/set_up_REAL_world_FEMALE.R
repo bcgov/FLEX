@@ -5,13 +5,12 @@ set_up_REAL_world_FEMALE <- function(propFemales,
                                      repro_estimates,
                                      Fpop){
 
+  # land = Mahal_land[[1]]; maxAgeFemale=9
   # Raster with mahalanobis distance (D2) values
   # Use mahal_metric to determine 
   cells.good.habitat <- sum(land)
   # total.cells <- dim(land)[1]*dim(land)[2]
   # actual.prop.hab <- cells.good.habitat / total.cells
-  
-  as.matrix(land@pCoords)
   
   # for some reason NetLogoR world matrices are set up differently from rasters
   # need to flip, change coordinates (-1), and keep in mind that NL worlds are col by row
@@ -61,7 +60,6 @@ set_up_REAL_world_FEMALE <- function(propFemales,
   fishers <- NLset(turtles = t0, agents=turtle(t0, who=t0$who),var="age", val=age.val)
   
   return(fishers)
-  
 }
 
 

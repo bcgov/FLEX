@@ -37,8 +37,6 @@ defineModule(sim, list(
                     "What is the initial proportion of femlaes to suitable FETAs to start?"),
     defineParameter("maxAgeFemale", "numeric", 9, NA, NA,
                     "What is the maximum age a female can have?"),
-    # defineParameter("dist_mov", "numeric", 1.0, NA, NA,
-    #                 "Distance of movement across landscape per time step"),
     defineParameter("sim_order", "numeric", 2, NA, NA,
                     ""),
     defineParameter("TS", "numeric", 10, NA, NA,
@@ -122,6 +120,16 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       }
       
       
+      # source("modules/FLEX/R/create_MAHAL_land.R")
+      # source("modules/FLEX/R/disperse_FEMALE.R")
+      # source("modules/FLEX/R/extract_Fpop.R")
+      # source("modules/FLEX/R/FEMALE_IBM_simulation_same_world.R")
+      # source("modules/FLEX/R/sim_output.R")
+      # source("modules/FLEX/R/repro_FEMALE.R")
+      # source("modules/FLEX/R/set_up_REAL_world_FEMALE.R")
+      # source("modules/FLEX/R/survive_FEMALE.R")
+      # source("modules/FLEX/R/uncertaintyFunctions.R")
+      
       # Mahal_land <- vector('list', 2)
       # 
       # for(i in 1:2){ # the number of Mahalanobis land layers from the clus obj
@@ -131,6 +139,14 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       #                                            mahal_metric = fread(file.path(paste0(getwd(),"/modules/FLEX/"),"data/mahal_metric.csv")),
       #                                            D2_param = c("Max","SD"))
       # }
+      
+
+      
+      
+      
+      
+      
+      
       
       
       # create fishers for start of simulation
@@ -161,7 +177,7 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       # for(i in 1:10){
       #   fishers_index[[i]]<- fishers
       # }
-      
+
    
       if (P(sim)$.plots) sim$land # not sure what this is for...
       
@@ -184,10 +200,10 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       # 5) create output as FLEX object
       # 5) have the FLEX object be the same object that can then be exported to be part of CLUS
       
-      sim$fishers_output <- vector('list', P(sim)$iterations)
+      sim$FLEX_output <- vector('list', P(sim)$iterations)
 
       for(i in 1:P(sim)$iterations){
-      fishers_output[[i]] <- FEMALE_IBM_simulation_same_world(land=sim$Mahal_land,
+      sim$FLEX_output[[i]] <- FEMALE_IBM_simulation_same_world(land=sim$Mahal_land,
                                                                        rMove=sim$IBM_aoi$rMove,
                                                                        fishers=sim$fishers_index[[i]],
                                                                        repro_estimates=sim$repro_estimates,
@@ -197,9 +213,9 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
                                                                        clus_yrs=P(sim)$clus_yrs)
       }
       
-      # fishers_output <- vector('list', 10)
+      # FLEX_output <- vector('list', 10)
       # for(i in 1:10){
-      #   fishers_output[[i]] <- FEMALE_IBM_simulation_same_world(land=Mahal_land,
+      #   FLEX_output[[i]] <- FEMALE_IBM_simulation_same_world(land=Mahal_land,
       #                                                           rMove=IBM_aoi$rMove,
       #                                                           fishers=fishers_index[[i]],
       #                                                           repro_estimates=repro_estimates,
@@ -217,48 +233,56 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       
       # will need to add the two simulations together...
 
-      sim$FEMALE_output <- sim_output(sim_out = sim$fishers_output, 
+      sim$FLEX_agg_output <- sim_output(sim_out = sim$FLEX_output, 
                                       iterations = P(sim)$iterations, 
                                       clus_yrs = P(sim)$clus_yrs)
       
       
-      FEMALE_output <- sim_output(sim_out = fishers_output, 
-                                  iterations = 10, 
-                                  clus_yrs = 5)
-      
-      if (P(sim)$.plots) sim$FEMALE_output
-      
-      # sim$EX_real_heatmap <- heatmap_output(sim_out = sim$fishers_output, 
-      #                                         # sim_order = P(sim)$sim_order, 
-      #                                         numsims = P(sim)$iterations, 
-      #                                         yrs_sim = P(sim)$yrs.to.run, 
-      #                                         TS = P(sim)$TS,
-      # propFemales = P(sim)$propFemales
-      #                                         rextent = sim$rFpop,
-      #                                         name_out = P(sim)$name_out)
+      # FLEX_agg_output <- sim_output(sim_out = FLEX_output,
+      #                             iterations = 10,
+      #                             clus_yrs = 5)
 
+      
+      sim$FLEX_heatmap <- heatmap_output(sim_out = sim$FLEX_output,
+                                         iterations = P(sim)$iterations,
+                                         clus_yrs = P(sim)$clus_yrs,
+                                         propFemales = P(sim)$propFemales,
+                                         rextent = sim$Mahal_land[[1]])
+      
+      # FLEX_heatmap <- heatmap_output(sim_out = FLEX_output,
+      #                                    iterations = 10,
+      #                                    clus_yrs = 5,
+      #                                    propFemales = 0.3,
+      #                                    rextent = Mahal_land[[1]])
+
+     
+      sim$FLEX_setup <- setup_raster(land=sim$Mahal_land[[1]],
+                                     fishers=sim$fishers)
+      
+      
+      
       if (P(sim)$.plots){
         
-        Cairo(file = file.path(Paths$outputPath, "IBM_MeanSE.PNG"),
-              type = "png", width = 3000, height = 2200, 
-              pointsize = 15, bg = "white", dpi = 300)
-        sim$EX_real$sim.TS.plot_se
-        dev.off()
+        # Cairo(file = file.path(Paths$outputPath, "IBM_MeanSE.PNG"),
+        #       type = "png", width = 3000, height = 2200, 
+        #       pointsize = 15, bg = "white", dpi = 300)
+        # sim$EX_real$sim.TS.plot_se
+        # dev.off()
+        # 
+        # # plot of initial starting points for adult female fishers
+        # Cairo(file = file.path(Paths$outputPath, "IBM_Saoi.PNG"),
+        #       type = "png", width = 3000, height = 2200, pointsize = 15,
+        #       bg = "white", dpi = 300)
+        # raster::plot(sim$EX_real.FEMALE[[1]]$land, 
+        #      legend = FALSE, 
+        #      main = "Simulated Fisher Established Territories within Area of Interest")
+        # points(sim$EX_real.FEMALE[[1]]$t0, 
+        #        pch = sim$EX_real.FEMALE[[1]]$t0$shape, 
+        #        col = of(agents = sim$EX_real.FEMALE[[1]]$t0, 
+        #                 var = "color"))
+        # dev.off()
         
-        # plot of initial starting points for adult female fishers
-        Cairo(file = file.path(Paths$outputPath, "IBM_Saoi.PNG"),
-              type = "png", width = 3000, height = 2200, pointsize = 15,
-              bg = "white", dpi = 300)
-        raster::plot(sim$EX_real.FEMALE[[1]]$land, 
-             legend = FALSE, 
-             main = "Simulated Fisher Established Territories within Area of Interest")
-        points(sim$EX_real.FEMALE[[1]]$t0, 
-               pch = sim$EX_real.FEMALE[[1]]$t0$shape, 
-               col = of(agents = sim$EX_real.FEMALE[[1]]$t0, 
-                        var = "color"))
-        dev.off()
-        
-        raster::plot(sim$EX_real_heatmap$raster)
+        raster::plot(sim$FLEX_heatmap$raster)
         
       }
       
