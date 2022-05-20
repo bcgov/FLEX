@@ -1,3 +1,17 @@
+# Copyright 2021 Province of British Columbia
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+#===========================================================================================#
+# You may obtain a copy of the License at
+# 
+# http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and limitations under the License.
+#===========================================================================================#
+
 ## Everything in this file and any files in the R directory are sourced during `simInit()`;
 ## all functions and objects are put into the `simList`.
 ## To use objects, use `sim$xxx` (they are globally available to all modules).
@@ -29,7 +43,7 @@ defineModule(sim, list(
                     "Should the simulation save output plots?"),
     defineParameter(".useCache", "logical", FALSE, NA, NA,
                     "Should caching of events or module be used?"),
-    defineParameter("iterations", "numeric", 100, NA, NA,               # hard coding it in for 100 simulations - makes it easier for output
+    defineParameter("iterations", "numeric", 5, NA, NA,               # keep small for testing, update to 100 simulations when functional
                     "How many iterations or replicates should be run?"),
     defineParameter("yrs.to.run", "numeric", 10, NA, NA,
                     "How many years should the simulation run for?"),
@@ -37,12 +51,12 @@ defineModule(sim, list(
                     "What is the initial proportion of femlaes to suitable FETAs to start?"),
     defineParameter("maxAgeFemale", "numeric", 9, NA, NA,
                     "What is the maximum age a female can have?"),
-    defineParameter("sim_order", "numeric", 2, NA, NA,
+    defineParameter("clus_yrs", "numeric", 2, NA, NA,
                     ""),
-    defineParameter("TS", "numeric", 10, NA, NA,
-                    "Year (timestep) to use when creating heatmap"),
-    defineParameter("name_out", "character", "Cariboo", NA, NA,
-                    "")
+    defineParameter("calculateInterval", "numeric", 1, NA, NA,
+                    "interval to run each dynamic simulation"),
+    defineParameter("D2_param", "character", "Max", NA, NA,
+                    "The Mahalanobis distance metric (Max, Mean, SD) to use as the threshold for suitable habitat")
     ),
   inputObjects = bindrows( #TODO: JB to complete
     expectsInput(objectName = "repro_estimates", objectClass = "data.table", 
@@ -73,12 +87,11 @@ defineModule(sim, list(
                                "Max: XXXX",
                                "Taken from Rich Weir's Mahalanobis distance analysis"), 
                  sourceURL = NA),
-    expectsInput(objectName = "IBM_aoi", objectClass = "list", 
-                 desc = paste0("list containing 4 raster stacks: rMahal, rMove, rFpop, rFHzone",
+    expectsInput(objectName = "flexRasWorld", objectClass = "list", 
+                 desc = paste0("list containing 3 raster stacks: rFHzone, rMahal, rMove",
+                               "rFHzone: Fisher Habitat Zone (1:4, as above); static",
                                "rMahal (raster stacks): Mahalanobis distance values; updated once every clus_yrs",
-                               "rMove (raster stacks): movement values; updated once every clus_yrs",
-                               "rFpop: Fisher population (1=Boreal, 2=Columbian); static",
-                               "rFHzone: Fisher Habitat Zone (1:4, as above); static"),  
+                               "rMove (raster stacks): movement values; updated once every clus_yrs"),  
                  sourceURL = NA),
   ),
   outputObjects = bindrows(
@@ -90,10 +103,10 @@ defineModule(sim, list(
                   desc = "Describes the fishers (agents) on the land"),
     createsOutput(objectName = "fishers_index", objectClass = "list", 
                   desc = "A list of length iterations describing the fishers (agents) on the land"),
+    createsOutput(objectName = "FLEX_output", objectClass = "list", 
+                  desc = "A list of length iterations describing the fishers (agents) on the land"),
     createsOutput(objectName = "Mahal_land", objectClass = "list", 
-                  desc = " list of worldMatrix objects that describe the underlying landscape, 0=unsuitable habitat, 1=suitable FETA"),
-    createsOutput(objectName = "FEMALE_IBM_dynamic", objectClass = "list", 
-                  desc = "list of worldArray objects that describe the female fisher population using updated landscapes")
+                  desc = " list of worldMatrix objects that describe the underlying landscape, 0=unsuitable habitat, 1=suitable FETA")
   )
 ))
 
@@ -113,8 +126,8 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       
       for(i in 1:sim$num.land.updates){ # the number of Mahalanobis land layers from the clus obj
         
-        sim$Mahal_land[[i]] <- create_MAHAL_land(rFHzone = sim$IBM_aoi$rFHzone,
-                                      rMahal = sim$IBM_aoi$rMahal[[i]],
+        sim$Mahal_land[[i]] <- create_MAHAL_land(rFHzone = sim$flexRasWorld[[1]],
+                                      rMahal = sim$flexRasWorld[[2]][[i]],
                                       mahal_metric = sim$mahal_metric,
                                       D2_param = P(sim)$D2_param)
       }
@@ -146,12 +159,10 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       
       
       
-      
-      
-      
-      # create fishers for start of simulation
-      sim$Fpop <- extract_Fpop(rFpop=sim$IBM_aoi$rFpop)
-      # Fpop <- extract_Fpop(rFpop=IBM_aoi$rFpop)
+    # create Fpop as character value based on fisher habitat zone (Boreal = Boreal all others = Columbian)
+      if(modal(values(sim$flexRasWorld[[1]]), ties='lowest', na.rm=TRUE, freq=FALSE) == 1){
+        sim$Fpop <- 'B'
+      }else{sim$Fpop <- 'C'}
       
       sim$fishers <- set_up_REAL_world_FEMALE(propFemales = P(sim)$propFemales,
                                          maxAgeFemale = P(sim)$maxAgeFemale,
@@ -203,8 +214,8 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       sim$FLEX_output <- vector('list', P(sim)$iterations)
 
       for(i in 1:P(sim)$iterations){
-      sim$FLEX_output[[i]] <- FEMALE_IBM_simulation_same_world(land=sim$Mahal_land,
-                                                                       rMove=sim$IBM_aoi$rMove,
+      sim$FLEX_output[[i]] <- FEMALE_IBM_simulation_same_world(land=sim$Mahal_land[[i]],
+                                                                       rMove=sim$flexRasWorld[[3]][[i]],
                                                                        fishers=sim$fishers_index[[i]],
                                                                        repro_estimates=sim$repro_estimates,
                                                                        Fpop=sim$Fpop,
@@ -226,7 +237,7 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       # }
       
       # Schedule next event
-      sim <- scheduleEvent(sim, time(sim) + 1, "FLEX", "dynamicSimulation")
+      sim <- scheduleEvent(sim, time(sim) + P(sim)$calculateInterval, "FLEX", "dynamicSimulation")
     },
     
     generateOutputs = {
@@ -287,7 +298,7 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       }
       
       # Schedule next event
-      sim <- scheduleEvent(sim, time(sim) + 1, "FLEX", "generateOutputs")
+      sim <- scheduleEvent(sim, time(sim) + P(sim)$calculateInterval, "FLEX", "generateOutputs")
     },
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
                   "\' in module \'", current(sim)[1, "moduleName", with = FALSE], "\'", sep = ""))
@@ -326,10 +337,10 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
                                    "data/mahal_metric.csv"))
   }
   
-  if (!suppliedElsewhere(object = "IBM_aoi", sim = sim)){
-    sim$IBM_aoi <- qread(file.path(Paths[["modulePath"]],
+  if (!suppliedElsewhere(object = "flexRasWorld", sim = sim)){
+    sim$flexRasWorld <- readRDS(file.path(Paths[["modulePath"]],
                                      currentModule(sim), 
-                                     "data/EX_Cariboo_IBM_aoi.qs"))
+                                     "data/flexRasWorld.rds"))
   }
   
   if (!suppliedElsewhere(object = "surv_estimates", sim = sim)){
