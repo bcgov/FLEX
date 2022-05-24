@@ -95,17 +95,20 @@ defineModule(sim, list(
     createsOutput(objectName = "Fpop", objectClass = "character", 
                   desc = "Describes which population the simulation is running for"),
     createsOutput(objectName = "clus_yrs", objectClass = "numeric", 
-                  desc = "The number of annual land updates provided by FlexRasWorld"),
+                  desc = "The number of annual land updates provided by flexRasWorld"),
     createsOutput(objectName = "fishers", objectClass = "agentMatrix object", 
                   desc = "Describes the fishers (agents) on the land at the start of the simulation"),
     createsOutput(objectName = "FLEX_output", objectClass = "list", 
                   desc = "A list of length iterations describing the fishers (agents) on the land at the end of each iteration"),
-    # createsOutput(objectName = "FLEX_output", objectClass = "list", 
-    #               desc = "A list of length iterations describing the fishers (agents) on the land"),
     createsOutput(objectName = "Mahal_land", objectClass = "list", 
-                  desc = " list of worldMatrix objects that describe the underlying landscape, 0=unsuitable habitat, 1=suitable FETA")
+                  desc = " list of worldMatrix objects that describe the underlying landscape, 0=unsuitable habitat, 1=suitable FETA"),
+    createsOutput(objectName = "FLEX_setup", objectClass = "list",
+                  desc = paste0("A list containing a raster and summarized info",
+                  "r_start = raster of the inital set up of adults female fishers with established territories and remaining suitable FETAs",
+                  "pop_info = values for number FETAS of suitable habitat, total habitat, percentage habitat, and number of adult females with established territories"))
   )
 ))
+
 
 ## event types
 
@@ -127,12 +130,16 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       sim$fishers <- set_up_REAL_world_FEMALE(propFemales = P(sim)$propFemales,
                                          maxAgeFemale = P(sim)$maxAgeFemale,
                                          rFHzone = sim$flexRasWorld[[1]],
-                                         rMahal = sim$flexRasWorld[[2]][[i]],
+                                         rMahal = sim$flexRasWorld[[2]][[1]],
                                          mahal_metric = sim$mahal_metric,
                                          D2_param = P(sim)$D2_param,
                                          Fpop=sim$Fpop,
                                          repro_estimates = sim$repro_estimates)
 
+      
+      # generate output of initial world
+      sim$FLEX_setup <- setup_raster(land=sim$Mahal_land[[1]],
+                                     fishers=sim$fishers)
       
       # duplicate to have the same starting point for all iterations
       sim$FLEX_output <- vector('list', P(sim)$iterations)
@@ -142,53 +149,65 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       }
       
       
-   
       # if (P(sim)$.plots) sim$land # not sure what this is for...
       
       
       # schedule future event(s)
-      sim <- scheduleEvent(sim, time(sim), "FLEX", "dynamicSimulation")
-      sim <- scheduleEvent(sim, time(sim), "FLEX", "generateOutputs")
+      sim <- scheduleEvent(sim, time(sim) + P(sim)$calculateInterval, "FLEX", "dynamicSimulation")
+      # sim <- scheduleEvent(sim, time(sim), "FLEX", "generateOutputs")
+      sim <- scheduleEvent(sim, end(sim), "FLEX", "generateOutputs") # wait until the end to generate outputs
+      
     },
    
     dynamicSimulation = {
       
-      # land, rMove and fishers will all need to be indexed to update as per yrs.to.run argument (yrs.to.run/clus_yrs = times to run sim)
-      # sim$num.land.updates <- P(sim)$yrs.to.run / P(sim)$clus_yrs # clus obj updates every 5 years (default)
       
-
       # for each simulation
       # 1) start with same base / scenario start
-      # 2) run for 1 run of clus_yrs with same landscape
-      # 4) do for 100 fisher objects
-      # 5) create output as FLEX object
-      # 5) have the FLEX object be the same object that can then be exported to be part of CLUS
+      # 2) run for 100 fisher objects
+      # 3) create output as FLEX object
+      # 4) have the FLEX object be the same object that can then be exported back to CLUS
       
-      sim$FLEX_output <- vector('list', P(sim)$iterations)
-
-      for(i in 1:P(sim)$iterations){
-      sim$FLEX_output[[i]] <- FEMALE_IBM_simulation_same_world(land=sim$Mahal_land[[i]],
-                                                                       rMove=sim$flexRasWorld[[3]][[i]],
-                                                                       fishers=sim$fishers_index[[i]],
-                                                                       repro_estimates=sim$repro_estimates,
-                                                                       Fpop=sim$Fpop,
-                                                                       surv_estimates=sim$surv_estimates,
-                                                                       maxAgeFemale=P(sim)$maxAgeFemale,
-                                                                       clus_yrs=P(sim)$clus_yrs)
+      sim$clus_yrs <- as.numeric(dim(sim$flexRasWorld[[2]])[3]) # number of years with updated landscape in flexRasWorld
+      
+      sim$Mahal_land <- vector('list', sim$clus_yrs)
+      
+      for(i in 1:sim$clus_yrs){
+        sim$Mahal_land[[i]] <- create_MAHAL_land(rFHzone = sim$flexRasWorld[[1]],
+                                                 rMahal = sim$flexRasWorld[[2]][[i]],
+                                                 mahal_metric = sim$mahal_metric,
+                                                 D2_param = P(sim)$D2_param)
       }
       
-      # FLEX_output <- vector('list', 10)
-      # for(i in 1:10){
-      #   FLEX_output[[i]] <- FEMALE_IBM_simulation_same_world(land=Mahal_land,
-      #                                                           rMove=IBM_aoi$rMove,
-      #                                                           fishers=fishers_index[[i]],
-      #                                                           repro_estimates=repro_estimates,
-      #                                                           Fpop=Fpop,
-      #                                                           surv_estimates=surv_estimates,
-      #                                                           maxAgeFemale=9,
-      #                                                           clus_yrs=5)
+      
+        foreach (i = 1:P(sim)$iterations) %do% {     # will need to update to %dopar% and add in parameter on how many cores to run
+          for(t in 1:sim$clus_yrs){ 
+            sim$FLEX_output[[i]] <- FEMALE_IBM_simulation_same_world(land=sim$Mahal_land[[t]],
+                                             rMove=sim$flexRasWorld[[3]][[t]],
+                                             fishers=sim$FLEX_output[[i]],
+                                             repro_estimates=sim$repro_estimates,
+                                             Fpop=sim$Fpop,
+                                             surv_estimates=sim$surv_estimates,
+                                             maxAgeFemale=P(sim)$maxAgeFemale)
+          }
+        } #end of foreach
+      
+
+      # going to need to think of way to append / bind FLEX_outputs together between calculate intervals
+      
+      # for(i in 1:P(sim)$iterations){
+      # sim$FLEX_output[[i]] <- FEMALE_IBM_simulation_same_world(land=sim$Mahal_land[[1]],
+      #                                                          rMove=sim$flexRasWorld[[3]][[1]],
+      #                                                          fishers=sim$FLEX_output[[i]],
+      #                                                          repro_estimates=sim$repro_estimates,
+      #                                                          Fpop=sim$Fpop,
+      #                                                          clus_yrs=sim$clus_yrs,
+      #                                                          surv_estimates=sim$surv_estimates,
+      #                                                          maxAgeFemale=P(sim)$maxAgeFemale)
       # }
       
+      
+     
       # Schedule next event
       sim <- scheduleEvent(sim, time(sim) + P(sim)$calculateInterval, "FLEX", "dynamicSimulation")
     },
@@ -209,7 +228,6 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       
       sim$FLEX_heatmap <- heatmap_output(sim_out = sim$FLEX_output,
                                          iterations = P(sim)$iterations,
-                                         clus_yrs = P(sim)$clus_yrs,
                                          propFemales = P(sim)$propFemales,
                                          rextent = sim$Mahal_land[[1]])
       
@@ -220,31 +238,11 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       #                                    rextent = Mahal_land[[1]])
 
      
-      sim$FLEX_setup <- setup_raster(land=sim$Mahal_land[[1]],
-                                     fishers=sim$fishers)
+      
       
       
       
       if (P(sim)$.plots){
-        
-        # Cairo(file = file.path(Paths$outputPath, "IBM_MeanSE.PNG"),
-        #       type = "png", width = 3000, height = 2200, 
-        #       pointsize = 15, bg = "white", dpi = 300)
-        # sim$EX_real$sim.TS.plot_se
-        # dev.off()
-        # 
-        # # plot of initial starting points for adult female fishers
-        # Cairo(file = file.path(Paths$outputPath, "IBM_Saoi.PNG"),
-        #       type = "png", width = 3000, height = 2200, pointsize = 15,
-        #       bg = "white", dpi = 300)
-        # raster::plot(sim$EX_real.FEMALE[[1]]$land, 
-        #      legend = FALSE, 
-        #      main = "Simulated Fisher Established Territories within Area of Interest")
-        # points(sim$EX_real.FEMALE[[1]]$t0, 
-        #        pch = sim$EX_real.FEMALE[[1]]$t0$shape, 
-        #        col = of(agents = sim$EX_real.FEMALE[[1]]$t0, 
-        #                 var = "color"))
-        # dev.off()
         
         raster::plot(sim$FLEX_heatmap$raster)
         
@@ -292,7 +290,7 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
   
   if (!suppliedElsewhere(object = "flexRasWorld", sim = sim)){
     sim$flexRasWorld <- readRDS(file.path(Paths[["modulePath"]],
-                                     currentModule(sim), 
+                                     currentModule(sim),
                                      "data/flexRasWorld.rds"))
   }
   

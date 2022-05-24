@@ -40,8 +40,6 @@ create_MAHAL_land <- function(rFHzone,
 
   # sum(rMahal_list[[1]]@data@values, na.rm=TRUE)+sum(rMahal_list[[2]]@data@values, na.rm=TRUE)+sum(rMahal_list[[3]]@data@values, na.rm=TRUE)
 
-  plot(rMahal<10)
-  
   rMahal_brick <- brick(rMahal_list)
   rMahal_ST <- calc(rMahal_brick, sum, na.rm=TRUE)
   # plot(rMahal_ST)

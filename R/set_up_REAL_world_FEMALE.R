@@ -22,9 +22,7 @@ set_up_REAL_world_FEMALE <- function(propFemales,
                                      repro_estimates,
                                      Fpop){
 
-  # Raster with mahalanobis distance (D2) values
-  # Use mahal_metric to determine
-  land <- create_MAHAL_land(rFHzone=rFHzone, rMahal=rMahal,mahal_metric=mahal_metric, D2_param=D2_param)
+  land <- create_MAHAL_land(rFHzone=rFHzone, rMahal=rMahal, mahal_metric=mahal_metric, D2_param=D2_param)
   
   cells.good.habitat <- sum(land)
   # total.cells <- dim(land)[1]*dim(land)[2]
@@ -81,12 +79,12 @@ set_up_REAL_world_FEMALE <- function(propFemales,
 }
 
 
-# fishers <- set_up_REAL_world_FEMALE(propFemales = 0.3,
-#                                     maxAgeFemale = 9,
-#                                     rFHzone = flexRasWorld[[1]],
-#                                     rMahal = flexRasWorld[[2]][[1]],
-#                                     mahal_metric = mahal_metric,
-#                                     D2_param = "Max",
-#                                     repro_estimates = repro_estimates,
-#                                     Fpop = "C")
+# set_up_REAL_world_FEMALE(propFemales = 0.3,
+#                          maxAgeFemale = 9,
+#                          rFHzone = flexRasWorld[[1]],
+#                          rMahal = flexRasWorld[[2]][[1]],
+#                          mahal_metric = mahal_metric,
+#                          D2_param = c("Max", "SD"),
+#                          repro_estimates = repro_estimates,
+#                          Fpop = "C")
 

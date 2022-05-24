@@ -17,8 +17,8 @@ disperse_FEMALE <- function(land,
                             rMove,
                             fishers){ # removed dist.move, torus and out - specify where to move so not necessary anymore (default to stay within study area)
   
+  # NEED TO UPDATE - disperse April check underlying land, disperse Oct uses same land as April...not sure how this will work yet
   # UPDATED - now fishers checked at the start of the function to determine underlying patch condition
-  # NEED TO UPDATE HAVE FISHERS PREFERNTIALLY MOVE TO PATCHES WITH MINIMUM 50% COVER - CAN'T DISPERSE IF UNSUITABLE MOVEMENT
   # Only want fishers without established territories to move
   # Assume female fisher can move ~35 km in a month, and that each pixel is 5.5 km in length or 7.8 km in diameter
   # This means that a female fisher can move between 5-6 pixels per month or 30-36 pixels in each time step
@@ -53,12 +53,12 @@ disperse_FEMALE <- function(land,
   disperseInd <- turtle(fishers, who = whoDFishers) # fishers who are dispersing (i.e., kits)
 
   # only run if fishers
-  # if (length(DT) > 1){ # might have to change to lenght...the issue of dealing with 0s in the WorldArray matrix
+  # if (length(DT) > 1){ # might have to change to length...the issue of dealing with 0s in the WorldArray matrix
     
   if(NLcount(disperseInd)!=0){
 
-    # The landscape is wrapped (torus = TRUE), meaning dispersing fishers re-enter
-    # and the fishers can disperse outside of the landscape (out=TRUE)
+    # The landscape is not wrapped (torus = FALSE), meaning dispersing fishers cannot re-enter
+    # fishers can disperse outside of the landscape (out=TRUE)
     # have it so that fishers move only to neighbour with certain suitable habitat or movement value
     # written as a multi-step process:
     # 1. check neighbouring cells for suitable habitat and movement habitat values
@@ -91,15 +91,15 @@ disperse_FEMALE <- function(land,
     disperseInd.moved <- moveTo(disperseInd.move.who, agents=as.matrix(move.cells %>% ungroup() %>% dplyr::select(pxcor, pycor)))
 
 
-    # if any dispersing fishers have exited the worlds extent, remove them from the simulation
-    # only necessary for torus = FALSE
-    fisher.location <- as.data.frame(patchHere(land, fishers))
-    fisher.location$who <- fishers$who
-    # fisher.location %>% arrange(pxcor)
-    out.of.bounds.fisher <- fisher.location[is.na(fisher.location$pxcor),]$who
-
-    disperseInd.moved <- die(disperseInd.moved, who=out.of.bounds.fisher) # remove fishers who traveled outside worlds extent from dispersing object
-    fishers <- die(fishers, who=out.of.bounds.fisher) # remove fishers who traveled outside worlds extent from main object
+    # # if any dispersing fishers have exited the worlds extent, remove them from the simulation
+    # # only necessary for torus = FALSE and random movement - can comment out if choosing cells for fishers to move to
+    # fisher.location <- as.data.frame(patchHere(land, fishers))
+    # fisher.location$who <- fishers$who
+    # # fisher.location %>% arrange(pxcor)
+    # out.of.bounds.fisher <- fisher.location[is.na(fisher.location$pxcor),]$who
+    # 
+    # disperseInd.moved <- die(disperseInd.moved, who=out.of.bounds.fisher) # remove fishers who traveled outside worlds extent from dispersing object
+    # fishers <- die(fishers, who=out.of.bounds.fisher) # remove fishers who traveled outside worlds extent from main object
 
     # have the dispersing fishers move and update fisher data frame to note new locations
     valdisperseIndF <- of(agents=disperseInd.moved,
