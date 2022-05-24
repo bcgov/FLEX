@@ -12,16 +12,20 @@
 # See the License for the specific language governing permissions and limitations under the License.
 #===========================================================================================#
 
-###--- SET-UP WORLD bringin in land aoi created previously - for female only IBM
+###--- SET-UP WORLD for female only IBM
 set_up_REAL_world_FEMALE <- function(propFemales, 
                                      maxAgeFemale,
-                                     land,
+                                     rFHzone,
+                                     rMahal,
+                                     mahal_metric,
+                                     D2_param,
                                      repro_estimates,
                                      Fpop){
 
-  # land = Mahal_land[[1]]; maxAgeFemale=9
   # Raster with mahalanobis distance (D2) values
-  # Use mahal_metric to determine 
+  # Use mahal_metric to determine
+  land <- create_MAHAL_land(rFHzone=rFHzone, rMahal=rMahal,mahal_metric=mahal_metric, D2_param=D2_param)
+  
   cells.good.habitat <- sum(land)
   # total.cells <- dim(land)[1]*dim(land)[2]
   # actual.prop.hab <- cells.good.habitat / total.cells
@@ -79,7 +83,10 @@ set_up_REAL_world_FEMALE <- function(propFemales,
 
 # fishers <- set_up_REAL_world_FEMALE(propFemales = 0.3,
 #                                     maxAgeFemale = 9,
-#                                     land = land,
+#                                     rFHzone = flexRasWorld[[1]],
+#                                     rMahal = flexRasWorld[[2]][[1]],
+#                                     mahal_metric = mahal_metric,
+#                                     D2_param = "Max",
 #                                     repro_estimates = repro_estimates,
 #                                     Fpop = "C")
 

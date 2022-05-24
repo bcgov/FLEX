@@ -51,60 +51,57 @@ defineModule(sim, list(
                     "What is the initial proportion of femlaes to suitable FETAs to start?"),
     defineParameter("maxAgeFemale", "numeric", 9, NA, NA,
                     "What is the maximum age a female can have?"),
-    defineParameter("clus_yrs", "numeric", 2, NA, NA,
-                    ""),
     defineParameter("calculateInterval", "numeric", 1, NA, NA,
-                    "interval to run each dynamic simulation"),
+                    "What is the interval to run each dynamic simulation?"),
     defineParameter("D2_param", "character", "Max", NA, NA,
-                    "The Mahalanobis distance metric (Max, Mean, SD) to use as the threshold for suitable habitat")
+                    "Which Mahalanobis distance metric (Max, Mean, SD, or combination) to use as the threshold for suitable habitat?")
     ),
-  inputObjects = bindrows( #TODO: JB to complete
+  inputObjects = bindrows( 
     expectsInput(objectName = "repro_estimates", objectClass = "data.table", 
                  desc = paste0("Table with the following hearders: ",
                                "Param: mean, sd, L95CI, U95CI",
-                               "dr: XXXX",
-                               "ls: XXXX", 
+                               "dr: 0.75, 0.39, 0.58, 0.92 [B]; 0.54, 0.41, 0.40, 0.68 [C]",
+                               "ls: 2.6, 0.70, 2.25, 2.95 [B]; 1.7, 0.73, 1.28, 2.12 [C]", 
                                "Pop: Population the data belongs to",
-                               " This table is the reproduction table for Fisher",
-                               " published in XXXXX (20XX)"),  
-                 sourceURL = NA), #TODO: Eventually it would be good to have these files in the cloud (i.e., GDrive)
+                               "Taken from Lofroth (2022) vital rates paper"),  
+                 sourceURL = NA),
     expectsInput(objectName = "surv_estimates", objectClass = "data.table", 
                  desc = paste0("Table with the following hearders: ",
-                               "Surv: mean female survival (0-1)",
-                               "L95CI: lower confidence interval for survival (0-1)",
-                               "U95CI: upper confidence interval for survival (0-1)",
-                               "Cohort: Which cohort does the data belong to? ",
-                               "(Uppercase letters)",
-                               "Taken from Rory's updated survival, trapping",
-                               " mortality excluded"), 
+                               "Surv: mean female survival (0-1); not explicitly used in current module",
+                               "L95CI: lower confidence interval for survival (0-1); not used in current module",
+                               "U95CI: upper confidence interval for survival (0-1); not used in current module",
+                               "SurvLSE: Surv - Standard Error; used in current module",
+                               "SurvHSE: Surv + Standard Erorr; used in current module",
+                               "Cohort: Which cohort (uppercase letters) does the data belong to?",
+                               "Taken from Lofroth (2022) vital rates paper, adjusted by Rory Fogarty to exclude trapping mortality"), 
                  sourceURL = NA),
     expectsInput(objectName = "mahal_metric", objectClass = "data.table", 
                  desc = paste0("Table with the following hearders: ",
                                "FHE_zone: Fisher Habitat Extension Zone Name",
                                "FHE_zone_num: numeric value for each zone (1= Boreal, 2=Sub-Boreal moist, 3=Sub-Boreal dry, 4=Dry Forest",
-                               "Mean: XXXX",
-                               "SD: XXXX",
-                               "Max: XXXX",
+                               "Mean: 3.8, 4.4, 4.4, 3.6",
+                               "SD: 2.71, 1.09, 2.33, 1.62",
+                               "Max: 9.88, 6.01, 6.63, 7.50",
                                "Taken from Rich Weir's Mahalanobis distance analysis"), 
                  sourceURL = NA),
     expectsInput(objectName = "flexRasWorld", objectClass = "list", 
-                 desc = paste0("list containing 3 raster stacks: rFHzone, rMahal, rMove",
-                               "rFHzone: Fisher Habitat Zone (1:4, as above); static",
-                               "rMahal (raster stacks): Mahalanobis distance values; updated once every clus_yrs",
-                               "rMove (raster stacks): movement values; updated once every clus_yrs"),  
+                 desc = paste0("list containing 3 rasters: rFHzone, rMahal, rMove",
+                               "rFHzone: Fisher Habitat Zone (1:4, as above); static (used to determine the fisher population: Fpop)",
+                               "rMahal (raster stacks): Mahalanobis distance values; updated annually every clus_yrs",
+                               "rMove (raster stacks): movement values; updated annually every clus_yrs"),  
                  sourceURL = NA),
   ),
   outputObjects = bindrows(
-    createsOutput(objectName = "num.land.updates", objectClass = "numeric", 
-                  desc = "The number of times the underlying land needs to update (yrs.to.run / clus_years"),
     createsOutput(objectName = "Fpop", objectClass = "character", 
                   desc = "Describes which population the simulation is running for"),
+    createsOutput(objectName = "clus_yrs", objectClass = "numeric", 
+                  desc = "The number of annual land updates provided by FlexRasWorld"),
     createsOutput(objectName = "fishers", objectClass = "agentMatrix object", 
-                  desc = "Describes the fishers (agents) on the land"),
-    createsOutput(objectName = "fishers_index", objectClass = "list", 
-                  desc = "A list of length iterations describing the fishers (agents) on the land"),
+                  desc = "Describes the fishers (agents) on the land at the start of the simulation"),
     createsOutput(objectName = "FLEX_output", objectClass = "list", 
-                  desc = "A list of length iterations describing the fishers (agents) on the land"),
+                  desc = "A list of length iterations describing the fishers (agents) on the land at the end of each iteration"),
+    # createsOutput(objectName = "FLEX_output", objectClass = "list", 
+    #               desc = "A list of length iterations describing the fishers (agents) on the land"),
     createsOutput(objectName = "Mahal_land", objectClass = "list", 
                   desc = " list of worldMatrix objects that describe the underlying landscape, 0=unsuitable habitat, 1=suitable FETA")
   )
@@ -119,78 +116,34 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       ### check for more detailed object dependencies:
       ### (use `checkObject` or similar)
       
-      sim$num.land.updates <- P(sim)$yrs.to.run / P(sim)$clus_yrs # clus obj updates every 5 years (default)
       
-      # create underlying landscape for each round of land (i.e., clus objects) updates
-      sim$Mahal_land <- vector('list', sim$num.land.updates)
-      
-      for(i in 1:sim$num.land.updates){ # the number of Mahalanobis land layers from the clus obj
-        
-        sim$Mahal_land[[i]] <- create_MAHAL_land(rFHzone = sim$flexRasWorld[[1]],
-                                      rMahal = sim$flexRasWorld[[2]][[i]],
-                                      mahal_metric = sim$mahal_metric,
-                                      D2_param = P(sim)$D2_param)
-      }
-      
-      
-      # source("modules/FLEX/R/create_MAHAL_land.R")
-      # source("modules/FLEX/R/disperse_FEMALE.R")
-      # source("modules/FLEX/R/extract_Fpop.R")
-      # source("modules/FLEX/R/FEMALE_IBM_simulation_same_world.R")
-      # source("modules/FLEX/R/sim_output.R")
-      # source("modules/FLEX/R/repro_FEMALE.R")
-      # source("modules/FLEX/R/set_up_REAL_world_FEMALE.R")
-      # source("modules/FLEX/R/survive_FEMALE.R")
-      # source("modules/FLEX/R/uncertaintyFunctions.R")
-      
-      # Mahal_land <- vector('list', 2)
-      # 
-      # for(i in 1:2){ # the number of Mahalanobis land layers from the clus obj
-      # 
-      #   Mahal_land[[i]] <- create_MAHAL_land(rFHzone = IBM_aoi$rFHzone,
-      #                                            rMahal = IBM_aoi$rMahal[[i]],
-      #                                            mahal_metric = fread(file.path(paste0(getwd(),"/modules/FLEX/"),"data/mahal_metric.csv")),
-      #                                            D2_param = c("Max","SD"))
-      # }
-      
-
-      
-      
-      
-      
-      
-    # create Fpop as character value based on fisher habitat zone (Boreal = Boreal all others = Columbian)
+      # create Fpop as character value based on fisher habitat zone (Boreal = Boreal all others = Columbian)
       if(modal(values(sim$flexRasWorld[[1]]), ties='lowest', na.rm=TRUE, freq=FALSE) == 1){
         sim$Fpop <- 'B'
       }else{sim$Fpop <- 'C'}
       
+      
+      # create the starting world using, using the first layer from flexRasWorld and initial fisher parameters
       sim$fishers <- set_up_REAL_world_FEMALE(propFemales = P(sim)$propFemales,
                                          maxAgeFemale = P(sim)$maxAgeFemale,
-                                         land = sim$Mahal_land[[1]],
+                                         rFHzone = sim$flexRasWorld[[1]],
+                                         rMahal = sim$flexRasWorld[[2]][[i]],
+                                         mahal_metric = sim$mahal_metric,
+                                         D2_param = P(sim)$D2_param,
                                          Fpop=sim$Fpop,
                                          repro_estimates = sim$repro_estimates)
 
-      sim$fishers_index <- vector('list', P(sim)$iterations)
       
       # duplicate to have the same starting point for all iterations
+      sim$FLEX_output <- vector('list', P(sim)$iterations)
+      
       for(i in 1:P(sim)$iterations){
-        sim$fishers_index[[i]]<- sim$fishers
+        sim$FLEX_output[[i]]<- sim$fishers
       }
       
-      # fishers <- set_up_REAL_world_FEMALE(propFemales = 0.3,
-      #                                         maxAgeFemale = 9,
-      #                                         land = Mahal_land[[1]],
-      #                                         Fpop=Fpop,
-      #                                         repro_estimates=repro_estimates)
-      # 
-      # fishers_index <- vector('list', 10)
-      # 
-      # for(i in 1:10){
-      #   fishers_index[[i]]<- fishers
-      # }
-
+      
    
-      if (P(sim)$.plots) sim$land # not sure what this is for...
+      # if (P(sim)$.plots) sim$land # not sure what this is for...
       
       
       # schedule future event(s)

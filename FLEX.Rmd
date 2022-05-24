@@ -1,3 +1,16 @@
+<!--
+Copyright 2018 Province of British Columbia
+ 
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+ 
+http://www.apache.org/licenses/LICENSE-2.0
+ 
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and limitations under the License.-->
+
 ---
 title: "FLEX: Fisher Landscape Explorer Tool"
 author: "Joanna Burgar"
@@ -9,6 +22,12 @@ output:
 editor_options:
   chunk_output_type: console
 ---
+
+# Purpose
+
+'While classic population-level modeling is limited in its ability to integrate decision-making in its actual complexity, the development of individual- or agent-based models(IBM/ABMs) has opened the possibility of describing the way that decisions are made, and their effects, in minute detail' (DeAngelis & Diaz, 2019)
+
+FLEX is a decision-support tool to map potential consequences of management decisions on fisher populations. The FLEX engine is an individual-based model (IBM), written in the framework of SpaDES (spatially explicit discrete event simulations; https://predictiveecology.org/SpaDES/). FLEX uses empirical data on survival, reproduction and habitat relationships to forecast a spatial population response to changes in the landscape. FLEX integrates with other SpaDES modules (https://github.com/bcgov/clus/tree/main/R/SpaDES-modules), which provide projected habitat layers annually.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, eval = FALSE, results = "hold") ## TODO: use 'eval = TRUE'
@@ -22,27 +41,12 @@ This document is a living document outlining the vision and specifications for t
 
 The FLEX tool will use BC government warehouse publicly available layers to build the landbase and empirical and expert data to specify “suitable” fisher habitat (i.e., the relative probability of occupancy) as per the BC Fisher Habitat Working Group habitat retention tools guidance (https://www.bcfisherhabitat.ca/habitat-tools/) and the Weir and Corbould (2010) predictive variable for “openness”. This input layer may change but regardless of the underlying data, the important piece is that whatever data is used will produce a single “suitable” value for the female fisher territory sized cell to be used in the fisher population model (i.e., Individual Based Model; IBM). The initial simulations used a binary value to differentiate suitable (1) from unsuitable (0) habitat. Once an actual landbase is connected to the IBM, this will be a threshold value, written as an argument function, with the ability of the user to specify. For the first beta version of the R shiny app, the assumption is that the habitat quality is static once the tool starts (i.e., not dynamically changing during the scenarios) while the fisher population will be predicted for 20 years.
 
-## R Shiny Vision  
-
-•	For the beta version we will have 3-6 canned scenarios for end-users to see the functionality of the R shiny app. The scenarios will run for 20 years but the user can decide if they want a report generated at a one of four end points (5, 10, 15 or 20 years). If we have time in our current ESSA contract, we will provide end-users with a limited “user-defined” version of the tool where the IBM parameters can change but the landbase stays constant. To show the functionality of the tool, recommend three scenarios in each population (i.e., to show how the different IBM parameters influence the outcome) with two scenarios at the same scale but with different habitat configurations and the final scenario at a smaller scale to highlight implications at the finest scale. An example of the three scenarios in both the Boreal and the Central Interior (i.e., these three replicated in both populations):
-1.	A selection of cutblocks harvested in a predetermined TSA, reducing suitable habitat to 50% where habitat is left in big chunks but with big spaces between suitable habitat;
-2.	A selection of cutblocks harvested in the same predetermined TSA, reducing suitable habitat to 50% where habitat is left in smaller chunks and with smaller spaces between suitable habitat; and
-3.	A selection of cutblocks harvested within a predetermined Trapline to show the smaller scale impact of cutblocks for a fur harvester.
-•	Future versions of the tool will increase in complexity in four ways:
-1.	The model will run on the fly, providing the same canned scenarios as example documentation but the real power will be the user defined functionality.
-2.	The temporal period will increase up to 200 years, based on user specifications; i.e., the predicted scenarios will run for 1-200 years.
-3.	The landbase will become more complex in two ways:
-a.	It will be dynamic, following the SpaDES framework, with annual updates to the underlying landbase (forecast through the SpaDES framework); and
-b.	Additional modules will be added for forecasting; i.e., the tool will simultaneously predict fisher population change and annual changes to the landbase in terms of forest succession, harvesting, climate, wildfire, protected areas (i.e., as constraints to where harvesting can occur, taking into consideration old growth deferrals, Wildlife Habitat Areas, etc.).
-4.	The end user will be able to specify the starting point for some or all fishers; i.e., end users will provide a shapefile with known locations of fishers from a trapping study to set where some or all of the fishers start on the landbase. User will also be able to specify parameters for the IBM, the arguments currently written into the IBM functions.
-
-NOTE: The beta version will be built so that it can run as a stand-alone tool; future versions will need to integrate with the Caribou Land Use Simulator (CLUS) SpaDES framework to take advantage of the CLUS SpaDES modules (incredible amount of work already done and ongoing).
 
 ## Fisher Population Model (aka IBM)   
 
 Time steps are 6 months to account for seasonal behaviour changes. See Figure 1 for the general set up of the IBM. As an example, follow the birth of a female fisher. After ~ 6 months (in October) the kit is kicked out of her natal territory. If she finds an unoccupied territory of suitable habitat she will establish and scent the territory by the following April. If she can’t establish a territory she will continue dispersing, searching for a suitable territory for at least another year. If a male territory overlaps, she will mate and delay implantation until the following year. This cycle will continue until she dies, living at most to 9 years. We bring this knowledge into the IBM using empirical data. The male cycle is nearly the same, except that he doesn’t reproduce but instead its his proximity to the female that influences the females’ ability to reproduce; other differences are territory size, dispersal distance, and life span (larger, farther, and shorter for males, respectively). 
 
-![The life history stages for the Individual Based Model (IBM). Each time step is 6 months.](/figures/Figure1.png)
+![Conceputal diagram of FLEX (inputs, events, and outputs) and integration with CLUS.](/figures/FLEX_SpaDES_conceptual.png)
 
 The IBM consists of 5 key functions in 3 life stages: reproduce, survive, and disperse. These life stages are looped through an overarching IBM_simualtion function, which follows 5 steps. Steps 1 through 3 occur only once and then Steps 4 and 5 loop until the end of the simulation.
 In addition, there is a “set_up_world” function that simulates the world and the starting number and locations for fishers. This is a separate function for two reasons: 1) it needs to be updated to pull actual landbase information; and 2) for simulations we may want the exact same starting points and so will feed in the same world and t0 to the scenario simulations. The R script for the overarching function to control the integration of FLEX SpaDES module (and other potential modules) can be found in the repository `fisherLandscapePlanningTool`.
@@ -192,4 +196,4 @@ Once the FLEX tool has run (i.e., the IBM simulations have completed, currently 
 
 # Links to other modules   
 
-The raster output from this module will be available for the CLUS SpaDES modules as an input object, this will allow for dynamic fisher and landbase simulations in future iterations of both CLUS and FLEX.
+flexRasWorld is required (https://github.com/bcgov/clus/tree/main/R/SpaDES-modules)
