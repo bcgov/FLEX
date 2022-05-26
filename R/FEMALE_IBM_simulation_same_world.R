@@ -28,7 +28,7 @@ FEMALE_IBM_simulation_same_world <- function(land,
     tApr <- fishers[[last.iteration]]
   } else {tApr <- fishers}
   
-  
+
   # tApril	April	Establish / maintain territory & reproduce & scent territory
   # 	Females ≥ 0.5 years without established territories disperse (up to 30 FETAs / 6 months of movement)
   # 	Females > 2 years give birth and with established territories give birth; number of kits born conditional on denning rate and litter size
@@ -76,7 +76,7 @@ FEMALE_IBM_simulation_same_world <- function(land,
   
   print(NLcount(tOct))
   fishers <- tOct
-  
+
   return(fishers=fishers)
 }
 

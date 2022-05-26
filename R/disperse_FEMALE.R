@@ -24,15 +24,15 @@ disperse_FEMALE <- function(land,
   # This means that a female fisher can move between 5-6 pixels per month or 30-36 pixels in each time step
   # dist_mov relates to the number of cells (not quite right if fisher moving diagonally across a cell but works for our purposes)
 
-  # deals with inconsistencies between potential rMahal and rMove inputs
-  if(dim(rMove)[3]>1){
-    rMove <- rMove[[1]]
-  }
-
-  # now a list of World Array objects (not a raster stack)
-  if(length(land)>1){
-    land <- land[[1]]
-  }
+  # # deals with inconsistencies between potential rMahal and rMove inputs
+  # if(dim(rMove)[3]>1){
+  #   rMove <- rMove[[1]]
+  # }
+  # 
+  # # now a list of World Array objects (not a raster stack)
+  # if(length(land)>1){
+  #   land <- land[[1]]
+  # }
   
   mHabitat <- raster2world(rMove) # convert the underlying movement habitat layer to a NetLogo WorldMatrix object
   # if rMove is a RasterStack, defaults to first layer - this works for illustration purposes but will need to be conscious of it with dynamic simulations

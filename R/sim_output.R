@@ -12,19 +12,21 @@
 # See the License for the specific language governing permissions and limitations under the License.
 #===========================================================================================#
 
+# SpaDES.core:::.pkgEnv$.sim#$.recoverableObjs[[1]]
+
 # grab output from one set of simulations
 sim_output <- function(sim_out,
-                       iterations, 
+                       simulations, 
                        clus_yrs){
-  # sim_out=fishers_output; iterations=10; clus_yrs=5
+  # sim_out=mySim$FLEX_output; simulations=2; clus_yrs=5
   
-  ABM.df <- as.data.frame(array(NA,c(iterations,clus_yrs)))
+  ABM.df <- as.data.frame(array(NA,c(simulations,clus_yrs)))
   colnames(ABM.df) <- paste0("TimeStep_",str_pad(seq_len(clus_yrs),2,pad="0"))
   
-  # Rows = replicates (n = iterations)
+  # Rows = replicates (n = simulations)
   # Columns = time steps (n = clus_yrs)
   
-  Reps <- 1:iterations
+  Reps <- 1:simulations
   timeSteps <- 1:clus_yrs # Name = paste0("TimeStep_", 1:12)
   
   ABM.df <- rbindlist(lapply(Reps, function(rps){

@@ -22,17 +22,17 @@
 # the mean and se relate to the number of pixels (i.e., territories) selected per simulation
 
 heatmap_output <- function(sim_out, 
-                           iterations, 
+                           simulations, 
                            clus_yrs, 
                            propFemales,
                            rextent){
- # sim_out = FLEX_output; iterations = 10; clus_yrs = 5; propFemales = 0.3; rextent = Mahal_land[[1]]
-  
+ # sim_out = FLEX_output; simulations = 10; clus_yrs = 5; propFemales = 0.3; rextent = Mahal_land[[1]]
+  rw <- world2raster(rextent)
   
   TS_full=paste0("TimeStep_",str_pad(clus_yrs,2,pad="0"))
   
-  # find out how many runs had at least one female adult fisher alive at end)
-  tmp <- sim_output(sim_out=sim_out, iterations=iterations, clus_yrs=clus_yrs)
+  # find out how many runs had at least one female adult fisher with an established territory alive at end)
+  tmp <- sim_output(sim_out=sim_out, simulations=simulations, clus_yrs=clus_yrs) # simulations = num of simulations; # clus_yrs = num years run
   
   Nozero.runs <- tmp %>% filter(TimeStep==TS_full) %>%
     filter(Count!=0)
@@ -40,51 +40,62 @@ heatmap_output <- function(sim_out,
   tmp2 <- Nozero.runs %>% dplyr::select(Run)
   nozerosims <- tmp2$Run
   
-  # set extent of raster the same as extent of initial world
-  rw <- world2raster(rextent)
-  
-  r <- raster()
-  r <- setExtent(r, rw, keepres=TRUE)
-  
-  r_list=list()
   
   # for simulations where at least one fisher survived
-  for(i in 1:length(nozerosims)){
-    # i=1
-    ftmp1 <- sim_out[[nozerosims[i]]][[clus_yrs]]
-    whoEAF <- ftmp1[ftmp1$breed=="adult" & ftmp1$disperse=="E",]$who
-    EAFind <- turtle(ftmp1, who = whoEAF) # fishers who are dispersing (i.e., kits)
+  if(length(nozerosims)>0){
     
-    ftmp <- as.data.frame(patchHere(rextent, EAFind))
-    ftmp$Fisher <- 1
-    ftmp.sf <- st_as_sf(ftmp, coords = c("pxcor", "pycor"))
-    ftmp.sfp <- st_buffer(ftmp.sf, dist=.1)
+    # set extent of raster the same as extent of initial world
+    r <- raster()
+    r <- setExtent(r, rw, keepres=TRUE)
+    r_list=list()
     
-    r_list[[i]] <- rasterize(ftmp.sfp, r, field="Fisher", background=0) # interim work around until terra and new raster package uploaded
+    
+    # for simulations where at least one fisher survived
+    for(i in 1:length(nozerosims)){
+      # i=1
+      ftmp1 <- sim_out[[nozerosims[i]]][[clus_yrs]]
+      whoEAF <- ftmp1[ftmp1$breed=="adult" & ftmp1$disperse=="E",]$who
+      EAFind <- turtle(ftmp1, who = whoEAF) # fishers who are dispersing (i.e., kits)
+      
+      ftmp <- as.data.frame(patchHere(rextent, EAFind))
+      ftmp$Fisher <- 1
+      ftmp.sf <- st_as_sf(ftmp, coords = c("pxcor", "pycor"))
+      ftmp.sfp <- st_buffer(ftmp.sf, dist=.1)
+      
+      r_list[[i]] <- rasterize(ftmp.sfp, r, field="Fisher", background=0) # interim work around until terra and new raster package uploaded
+    }
   }
   
-  r_zeroes <- raster()
-  r_zeroes <- setExtent(r_zeroes, rw, keepres=TRUE)
-  values(r_zeroes) <- 0
   
-  r_zeroes_list=list()
-  
-  if(length(nozerosims)!=100){
-    for(i in 1:(100-length(nozerosims))){
+  if(length(nozerosims)!=simulations){
+    r_zeroes <- raster()
+    r_zeroes <- setExtent(r_zeroes, rw, keepres=TRUE)
+    values(r_zeroes) <- 0
+    
+    r_zeroes_list=list()
+    for(i in 1:(simulations-length(nozerosims))){
       r_zeroes_list[[i]] <- r_zeroes
     }
   }
   
-  r_stack = stack(r_list, r_zeroes_list)
+  
+  if(length(nozerosims)==simulations){
+    r_stack = stack(r_list)
+  } else { if(sum(nozerosims)==0){
+    r_stack = stack(r_zeroes_list)
+  } else {   r_stack = stack(r_list, r_zeroes_list) 
+  }
+ }
+
+  
   r_stackApply <- stackApply(r_stack, indices=1, fun=sum)
   
   extent(r_stackApply) <- extent(rextent)
 
-  
   # population start and predicted info
   Fisher_Nmean <- mean(r_stackApply@data@values)
   Fisher_Nse <- se(r_stackApply@data@values)
-  Fpredicted <- round(sum(r_stackApply@data@values/iterations))
+  Fpredicted <- round(sum(r_stackApply@data@values/simulations))
   
   predicted_info <- list(Fisher_Nmean=Fisher_Nmean, Fisher_Nse=Fisher_Nse, Fpredicted=Fpredicted)
   
