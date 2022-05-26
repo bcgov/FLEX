@@ -29,12 +29,12 @@ heatmap_output <- function(sim_out,
  # sim_out = FLEX_output; simulations = 10; clus_yrs = 5; propFemales = 0.3; rextent = Mahal_land[[1]]
   rw <- world2raster(rextent)
   
-  TS_full=paste0("TimeStep_",str_pad(clus_yrs,2,pad="0"))
+  TS_full=paste0("Year_",str_pad(clus_yrs,2,pad="0"))
   
   # find out how many runs had at least one female adult fisher with an established territory alive at end)
   tmp <- sim_output(sim_out=sim_out, simulations=simulations, clus_yrs=clus_yrs) # simulations = num of simulations; # clus_yrs = num years run
   
-  Nozero.runs <- tmp %>% filter(TimeStep==TS_full) %>%
+  Nozero.runs <- tmp %>% filter(Year==TS_full) %>%
     filter(Count!=0)
   
   tmp2 <- Nozero.runs %>% dplyr::select(Run)
@@ -87,18 +87,9 @@ heatmap_output <- function(sim_out,
   }
  }
 
-  
   r_stackApply <- stackApply(r_stack, indices=1, fun=sum)
-  
   extent(r_stackApply) <- extent(rextent)
 
-  # population start and predicted info
-  Fisher_Nmean <- mean(r_stackApply@data@values)
-  Fisher_Nse <- se(r_stackApply@data@values)
-  Fpredicted <- round(sum(r_stackApply@data@values/simulations))
-  
-  predicted_info <- list(Fisher_Nmean=Fisher_Nmean, Fisher_Nse=Fisher_Nse, Fpredicted=Fpredicted)
-  
-  return(list(raster=r_stackApply, nozerosims=nozerosims, predicted_info))
+  return(r_stackApply)
   
 }

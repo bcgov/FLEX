@@ -102,10 +102,18 @@ defineModule(sim, list(
                   desc = "A list of length fisher_output containing each clus_yrs"),
     createsOutput(objectName = "Mahal_land", objectClass = "list", 
                   desc = " list of worldMatrix objects that describe the underlying landscape, 0=unsuitable habitat, 1=suitable FETA"),
+    createsOutput(objectName = "FLEX_agg_output", objectClass = "data.table and data.frame",
+                  desc = "Aggregated output of the number of adult female fishers with established territories at the end of each clus_yr (3 columns: Run, Year, Count)"),
+    createsOutput(objectName = "FLEX_multi_output", objectClass = "data.table and data.frame",
+                  desc = "Rbind of all previoius FLEX_agg_outputs with the added 'id' column to indicate which sim interval it came from"),
+    createsOutput(objectName = "FLEX_heatmap", objectClass = "raster",
+                  desc = "A raster of the adult female fishers with established territories at the end of the clus_yrs run"),
+    createsOutput(objectName = "FLEX_multi_heatmap", objectClass = "raster",
+                  desc = "Raster stack summing previous FLEX_heatmap rasters"),
     createsOutput(objectName = "FLEX_setup", objectClass = "list",
                   desc = paste0("A list containing a raster and summarized info",
-                  "r_start = raster of the inital set up of adults female fishers with established territories and remaining suitable FETAs",
-                  "pop_info = values for number FETAS of suitable habitat, total habitat, percentage habitat, and number of adult females with established territories"))
+                                "r_start = raster of the inital set up of adults female fishers with established territories and remaining suitable FETAs",
+                                "pop_info = values for number FETAS of suitable habitat, total habitat, percentage habitat, and number of adult females with established territories"))
   )
 ))
 
@@ -151,8 +159,7 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       # schedule future event(s)
       sim <- scheduleEvent(sim, time(sim) + P(sim)$calculateInterval, "FLEX", "dynamicSimulation")
       sim <- scheduleEvent(sim, time(sim) + P(sim)$calculateInterval, "FLEX", "generateOutputs")
-      # sim <- scheduleEvent(sim, end(sim), "FLEX", "generateFinalOutputs") # wait until the end to generate outputs
-      
+
     },
    
     dynamicSimulation = {
@@ -193,6 +200,18 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       
       sim$fisher_output <- sim$FLEX_output # to ensure that the next time "dynamicSimulation" is run it reads from the latest iteration for each fisher object
      
+      
+      # summarise output per clus_yrs
+      sim$FLEX_agg_output <- sim_output(sim_out = sim$FLEX_output, 
+                                        simulations = P(sim)$simulations, 
+                                        clus_yrs = sim$clus_yrs)
+      
+      sim$FLEX_heatmap <- heatmap_output(sim_out = sim$FLEX_output,
+                                         simulations = P(sim)$simulations,
+                                         clus_yrs = sim$clus_yrs,
+                                         propFemales = P(sim)$propFemales,
+                                         rextent = sim$Mahal_land[[1]])
+      
       # Schedule next event
       sim <- scheduleEvent(sim, time(sim) + P(sim)$calculateInterval, "FLEX", "dynamicSimulation")
     },
@@ -203,27 +222,23 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       sim$FLEX_setup <- setup_raster(land=sim$Mahal_land[[1]],
                                      fishers=sim$fishers)
       
-      # will need to add the two simulations together...
-
-      sim$FLEX_agg_output <- sim_output(sim_out = sim$FLEX_output, 
-                                      simulations = P(sim)$simulations, 
-                                      clus_yrs = sim$clus_yrs)
+      if(length(sim$FLEX_multi_output)==0){
+        sim$FLEX_multi_output <- sim$FLEX_agg_output
+      } else{ 
+        sim$FLEX_multi_output <- rbind(sim$FLEX_multi_output, sim$FLEX_agg_output, idcol=TRUE)
+      }
       
       
-      sim$FLEX_heatmap <- heatmap_output(sim_out = sim$FLEX_output,
-                                         simulations = P(sim)$simulations,
-                                         clus_yrs = sim$clus_yrs,
-                                         propFemales = P(sim)$propFemales,
-                                         rextent = sim$Mahal_land[[1]])
-    
+      if(length(sim$FLEX_multi_heatmap)==0){
+        sim$FLEX_multi_heatmap <- sim$FLEX_heatmap
+      } else {
+        sim$FLEX_multi_heatmap <- stackApply(stack(sim$FLEX_multi_heatmap,sim$FLEX_heatmap), indices=1, fun=sum)
+        extent(sim$FLEX_multi_heatmap) <- extent(sim$FLEX_heatmap)
+      }
       
-      # if (P(sim)$.plots){
-      #   
-      #   raster::plot(sim$FLEX_heatmap$raster)
-      # }
       
-      # Schedule next event
       sim <- scheduleEvent(sim, time(sim) + P(sim)$calculateInterval, "FLEX", "generateOutputs")
+      
     },
     
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
