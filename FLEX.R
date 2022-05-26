@@ -157,8 +157,8 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       
       
       # schedule future event(s)
-      sim <- scheduleEvent(sim, time(sim) + P(sim)$calculateInterval, "FLEX", "dynamicSimulation")
-      sim <- scheduleEvent(sim, time(sim) + P(sim)$calculateInterval, "FLEX", "generateOutputs")
+      sim <- scheduleEvent(sim, time(sim) + P(sim)$calculateInterval, "FLEX", "dynamicSimulation", eventPriority = 8)
+      sim <- scheduleEvent(sim, time(sim) + P(sim)$calculateInterval, "FLEX", "generateOutputs", eventPriority = 9)
 
     },
    
@@ -225,7 +225,7 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       if(length(sim$FLEX_multi_output)==0){
         sim$FLEX_multi_output <- sim$FLEX_agg_output
       } else{ 
-        sim$FLEX_multi_output <- rbind(sim$FLEX_multi_output, sim$FLEX_agg_output, idcol=TRUE)
+        sim$FLEX_multi_output <- rbind(sim$FLEX_multi_output, sim$FLEX_agg_output, idcol=TRUE, fill=TRUE)
       }
       
       
