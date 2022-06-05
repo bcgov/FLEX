@@ -24,9 +24,8 @@
 heatmap_output <- function(sim_out, 
                            simulations, 
                            clus_yrs, 
-                           propFemales,
                            rextent){
- # sim_out = FLEX_output; simulations = 10; clus_yrs = 5; propFemales = 0.3; rextent = Mahal_land[[1]]
+ # sim_out = FLEX_output; simulations = 10; clus_yrs = 5; rextent = Mahal_land[[1]]
   rw <- world2raster(rextent)
   
   TS_full=paste0("Year_",str_pad(clus_yrs,2,pad="0"))

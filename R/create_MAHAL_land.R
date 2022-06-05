@@ -29,7 +29,7 @@ create_MAHAL_land <- function(rFHzone,
   FHzones <- unique(rFHzone@data@values)
   FHzones <- FHzones[!is.na(FHzones)]
 
-  freq(rMahal)
+  # freq(rMahal)
   
   rMahal_list <- list()
   for(i in 1:length(FHzones)){
@@ -41,7 +41,12 @@ create_MAHAL_land <- function(rFHzone,
   # sum(rMahal_list[[1]]@data@values, na.rm=TRUE)+sum(rMahal_list[[2]]@data@values, na.rm=TRUE)+sum(rMahal_list[[3]]@data@values, na.rm=TRUE)
 
   rMahal_brick <- brick(rMahal_list)
-  rMahal_ST <- calc(rMahal_brick, sum, na.rm=TRUE)
+  
+  if(length(rMahal_list)==1){
+    rMahal_ST <- rMahal_list[[1]]
+    rMahal_ST[is.na(rMahal_ST[])] <- 0
+  } else {  rMahal_ST <- calc(rMahal_brick, sum, na.rm=TRUE) }
+
   # plot(rMahal_ST)
   # sum(rMahal_ST@data@values)
 
@@ -51,7 +56,11 @@ create_MAHAL_land <- function(rFHzone,
 
 }
 
+# getwd()
+# flexRasWorld <-  readRDS("./modules/FLEX/data/flexRasWorld.rds")
+# 
 # land <- create_MAHAL_land(rFHzone = flexRasWorld[[1]], # 1=Boreal, 2=Sub-boreal moist, 3=Sub-boreal dry, 4= Dry forest
 #                           rMahal = flexRasWorld[[2]][[1]], # Mahalanobis distances for NetLogo world, subsequent rasters are 5 at year intervals
 #                           mahal_metric = fread(file.path(paste0(getwd(),"/modules/FLEX/"),"data/mahal_metric.csv"), select=c(1:5)),
-#                           D2_param = c("Max","Max"))
+#                           D2_param = c("Max","SD"))
+# plot(flexRasWorld[[1]])

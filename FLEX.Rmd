@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and limitations 
 ---
 title: "FLEX: Fisher Landscape Explorer Tool"
 author: "Joanna Burgar"
-date: "2 March 2022"
+date: "27 May 2022"
 output:
   pdf_document: default
   html_document:
