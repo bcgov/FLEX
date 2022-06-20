@@ -209,7 +209,6 @@ doEvent.FLEX = function(sim, eventTime, eventType) {
       sim$FLEX_heatmap <- heatmap_output(sim_out = sim$FLEX_output,
                                          simulations = P(sim)$simulations,
                                          clus_yrs = sim$clus_yrs,
-                                         propFemales = P(sim)$propFemales,
                                          rextent = sim$Mahal_land[[1]])
       
       # Schedule next event

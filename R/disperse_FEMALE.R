@@ -73,7 +73,7 @@ disperse_FEMALE <- function(land,
       mutate(moveTo = case_when(Habitat==1 ~ "SH",                               # create variable of SH (suitable habitat) or MH (movement habitat)
                                 mHabitat >= 0.5 & Habitat==0 ~ "MH")) %>%
       arrange(desc(moveTo), desc(mHabitat), .by_group=TRUE) %>%               # arrange so SH, MH, then NA and within each group by highest movement habitat
-      tibble::rowid_to_column() %>% mutate(mHab_ranks = min_rank(rowid))     # rank by habitat variable (SH, MH, NA) and quality of MH (>0.5 acceptable)
+      tibble::rowid_to_column() %>% mutate(mHab_ranks = rank(rowid, ties.method = "random"))     # rank by habitat variable (SH, MH, NA) and quality of MH (>0.5 acceptable)
 
     fisher.cells <- as.data.frame(fisher.cells)
     fisher.cells$fisher <- "present"
