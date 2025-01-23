@@ -1,0 +1,195 @@
+---
+title: "FLEX: Fisher Landscape Explorer Tool"
+author: "Joanna Burgar"
+date: "2 March 2022"
+output:
+  pdf_document: default
+  html_document:
+    keep_md: yes
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE, results = "hold") ## TODO: use 'eval = TRUE'
+```
+
+# Overview  
+
+This document is a living document outlining the vision and specifications for the Fisher Landscape Explorer (FLEX) tool. It is meant as a reference document to assist in building the beta version of R Shiny app (via ESSA Technologies Ltd.) and the SpaDES module of the Individual Based Model (IBM; via Tati Micheletti).
+
+## Initial Inputs and Assumptions   
+
+The FLEX tool will use BC government warehouse publicly available layers to build the landbase and empirical and expert data to specify “suitable” fisher habitat (i.e., the relative probability of occupancy) as per the BC Fisher Habitat Working Group habitat retention tools guidance (https://www.bcfisherhabitat.ca/habitat-tools/) and the Weir and Corbould (2010) predictive variable for “openness”. This input layer may change but regardless of the underlying data, the important piece is that whatever data is used will produce a single “suitable” value for the female fisher territory sized cell to be used in the fisher population model (i.e., Individual Based Model; IBM). The initial simulations used a binary value to differentiate suitable (1) from unsuitable (0) habitat. Once an actual landbase is connected to the IBM, this will be a threshold value, written as an argument function, with the ability of the user to specify. For the first beta version of the R shiny app, the assumption is that the habitat quality is static once the tool starts (i.e., not dynamically changing during the scenarios) while the fisher population will be predicted for 20 years.
+
+## R Shiny Vision  
+
+•	For the beta version we will have 3-6 canned scenarios for end-users to see the functionality of the R shiny app. The scenarios will run for 20 years but the user can decide if they want a report generated at a one of four end points (5, 10, 15 or 20 years). If we have time in our current ESSA contract, we will provide end-users with a limited “user-defined” version of the tool where the IBM parameters can change but the landbase stays constant. To show the functionality of the tool, recommend three scenarios in each population (i.e., to show how the different IBM parameters influence the outcome) with two scenarios at the same scale but with different habitat configurations and the final scenario at a smaller scale to highlight implications at the finest scale. An example of the three scenarios in both the Boreal and the Central Interior (i.e., these three replicated in both populations):
+1.	A selection of cutblocks harvested in a predetermined TSA, reducing suitable habitat to 50% where habitat is left in big chunks but with big spaces between suitable habitat;
+2.	A selection of cutblocks harvested in the same predetermined TSA, reducing suitable habitat to 50% where habitat is left in smaller chunks and with smaller spaces between suitable habitat; and
+3.	A selection of cutblocks harvested within a predetermined Trapline to show the smaller scale impact of cutblocks for a fur harvester.
+•	Future versions of the tool will increase in complexity in four ways:
+1.	The model will run on the fly, providing the same canned scenarios as example documentation but the real power will be the user defined functionality.
+2.	The temporal period will increase up to 200 years, based on user specifications; i.e., the predicted scenarios will run for 1-200 years.
+3.	The landbase will become more complex in two ways:
+a.	It will be dynamic, following the SpaDES framework, with annual updates to the underlying landbase (forecast through the SpaDES framework); and
+b.	Additional modules will be added for forecasting; i.e., the tool will simultaneously predict fisher population change and annual changes to the landbase in terms of forest succession, harvesting, climate, wildfire, protected areas (i.e., as constraints to where harvesting can occur, taking into consideration old growth deferrals, Wildlife Habitat Areas, etc.).
+4.	The end user will be able to specify the starting point for some or all fishers; i.e., end users will provide a shapefile with known locations of fishers from a trapping study to set where some or all of the fishers start on the landbase. User will also be able to specify parameters for the IBM, the arguments currently written into the IBM functions.
+
+NOTE: The beta version will be built so that it can run as a stand-alone tool; future versions will need to integrate with the Caribou Land Use Simulator (CLUS) SpaDES framework to take advantage of the CLUS SpaDES modules (incredible amount of work already done and ongoing).
+
+## Fisher Population Model (aka IBM)   
+
+Time steps are 6 months to account for seasonal behaviour changes. See Figure 1 for the general set up of the IBM. As an example, follow the birth of a female fisher. After ~ 6 months (in October) the kit is kicked out of her natal territory. If she finds an unoccupied territory of suitable habitat she will establish and scent the territory by the following April. If she can’t establish a territory she will continue dispersing, searching for a suitable territory for at least another year. If a male territory overlaps, she will mate and delay implantation until the following year. This cycle will continue until she dies, living at most to 9 years. We bring this knowledge into the IBM using empirical data. The male cycle is nearly the same, except that he doesn’t reproduce but instead its his proximity to the female that influences the females’ ability to reproduce; other differences are territory size, dispersal distance, and life span (larger, farther, and shorter for males, respectively). 
+
+![The life history stages for the Individual Based Model (IBM). Each time step is 6 months.](/figures/Figure1.png)
+
+The IBM consists of 5 key functions in 3 life stages: reproduce, survive, and disperse. These life stages are looped through an overarching IBM_simualtion function, which follows 5 steps. Steps 1 through 3 occur only once and then Steps 4 and 5 loop until the end of the simulation.
+In addition, there is a “set_up_world” function that simulates the world and the starting number and locations for fishers. This is a separate function for two reasons: 1) it needs to be updated to pull actual landbase information; and 2) for simulations we may want the exact same starting points and so will feed in the same world and t0 to the scenario simulations. The R script for the overarching function to control the integration of FLEX SpaDES module (and other potential modules) can be found in the repository `fisherLandscapePlanningTool`.
+
+
+# Usage
+
+```{r module_usage}
+# library(SpaDES.core)
+# 
+# setPaths(modulePath = file.path("C:/Users/Tati/Documents/GitHub"))
+# getPaths() # shows where the 4 relevant paths are
+# 
+# times <- list(start = 0, end = 10)
+# 
+# parameters <- list(
+#   #.progress = list(type = "text", interval = 1), # for a progress bar
+#   ## If there are further modules, each can have its own set of parameters:
+#   #module1 = list(param1 = value1, param2 = value2),
+#   #module2 = list(param1 = value1, param2 = value2)
+# )
+# modules <- list("FLEX")
+# objects <- list()
+# inputs <- list()
+# outputs <- list()
+# 
+# mySim <- simInit(times = times, params = parameters, modules = modules,
+#                  objects = objects)
+# 
+# mySimOut <- spades(mySim)
+```
+
+# Parameters   
+
+User-specified parameters (taken from the 5 function arguments)
+1.	Underlying landbase 
+2.	Starting point for fishers (number, location, etc)
+3.	Proximity of males to females for finding a mate
+4.	Denning rate upper and lower confidence intervals
+5.	Litter size upper and lower confidence intervals
+6.	Survival estimates at the cohort (adult and subadult) and population level
+7.	Lifespan for males and females 
+8.	Distance a female fisher can disperse in 1 step, assumes male moves twice as far
+9.	Number of years to run the simulation for (default is 10 years) 
+
+
+```{r moduleParams, echo = FALSE, eval = TRUE}
+# df_params <- SpaDES.core::moduleParams("FLEX", "C:/Users/Tati/Documents/GitHub")
+# knitr::kable(df_params)
+```
+
+# Events  
+
+The IBM starts at t0 (April) and considers the first two time steps (t1 = October, t2 = April) as part of the setup process. For a 10 year simulation, there will be 23 time steps (t0, t1, t2 plus 2*t10). The start of the output should be at t2, the starting point of the simulation, and end at t23.
+*** Step 1. START ***
+•	The assumption is that there is 100% survival during the first year (i.e., the set up), at the first time step no fishers die 
+•	t0 = October to April = kits are born; need to run through the reproduce functions
+i.	t0 <- find_mate(land=land, fishers=t0, fmdx=fmdx, fmdy=fmdy)
+ii.	t0 <- denning(fishers=t0, denLCI=denLCI, denUCI=denUCI)
+iii.	t0 <- kits_produced(fishers=t0, ltrM=ltrM, ltrSD=ltrSD)
+•	all fishers age 0.5 years
+ *** Step 2. AGE ***
+•	The assumption is that there is 100% survival during the first year (i.e., the set up), at the second time step no fishers die
+•	t1 = April to October = kits kicked out of natal territory
+•	all fishers age 0.5 years
+*** Step 3. ESTABLISH / MAINTAIN TERRITORY & SCENT TERRITORY (MATE) & SURVIVE ***
+•	 t2 = October to April = females with established territory find mate
+•	 3a = the first step is for individuals without territories to disperse; run through the disperse function up to 30 times to allow 6 months of movement
+i.	t2 <- disperse(land=land, fishers=t2, dist_mov=dist_mov, out=FALSE)
+•	3b = the second step is for female fishers with ESTABLISHED territories to find a mate; run through the reproduce find_mate function
+i.	t2 <- find_mate(land=land, fishers=t2, fmdx=fmdx, fmdy=fmdy)
+•	all fishers age 0.5 years
+•	at the end of this time step, all fishers subject to mortality; run through the survive function
+i.	t2 <- survive(fishers=t2, surv_estimates=rf_surv_estimates, Fpop=Fpop, maxAgeMale=maxAgeMale, maxAgeFemale=maxAgeFemale)
+*** Step 4.  ESTABLISH / MAINTAIN TERRITORY ***
+•	t3 = April to October = keep surviving
+•	4a = the first step is for individuals without territories to disperse; run through the disperse function up to 30 times to allow 6 months of movement
+i.	TOct <- disperse(land=land, fishers=tOct, dist_mov=dist_mov, out=FALSE)
+•	all fishers age 0.5 years
+•	update the fisher table to change juveniles to adults as they age out of (i.e., age > 2)
+*** Step 5. ESTABLISH / MAINTAIN TERRITORY & REPRODUCE & SCENT TERRITORY (MATE) & SURVIVE ***
+•	t4 = October to April = females with established territory produce kits and find mates for next round
+•	5a = the first step is for pregnant female fishers to reproduce; run through the reproduce denning and kits_produced functions
+i.	tApr <- denning(fishers=tOct, denLCI=denLCI, denUCI=denUCI)
+ii.	tApr <- kits_produced(fishers=tApr, ltrM=ltrM, ltrSD=ltrSD)
+•	5b = the second step is for juvenile fishers without established territories to move; loop through the disperse function up to 30 times
+i.	tApr <- denning(fishers=tOct, denLCI=denLCI, denUCI=denUCI)
+ii.	tApr <- disperse(land=land, fishers=tApr, dist_mov=dist_mov, out=out)
+•	5c = the third step is for female fishers with ESTABLISHED territories to find a mate; run through the reproduce find_mate function
+i.	tApr <- find_mate(land=land, fishers=tApr, fmdx=fmdx, fmdy=fmdy)
+•	all fishers age 0.5 years
+•	at the end of this time step, all fishers subject to mortality; run through the survive function
+i.	tApr <- survive(fishers=tApr, surv_estimates=rf_surv_estimates, Fpop=Fpop, maxAgeMale=maxAgeMale, maxAgeFemale=maxAgeFemale)
+
+
+## Functions   
+
+The five key functions are found in the `R folder` and are detailed below.
+REPRODUCE
+1.	Finding a mate
+•	Female fishers older than 1 year (age  > 1 ) with established territories are available to reproduce; are assigned a ‘mate_avail’ value of 1 (mated) or 0 (did not mate) based on male proximity
+•	Any male fisher older than 0.5 years (age > 0.5) within a specified number of cells can breed, regardless if he has established a territory
+•	User can specify proximity of males to females; default was upped to 4 cells in either direction (default is set to c(-4:4) for both xlim and ylim)
+2.	Denning rate
+•	Note: empirical data for denning rate is coupled with probability of finding a mate – since we are separating, the model denning rate should likely be higher (attempting to work around this by increasing the proximity distance for males to females when finding a mate)
+•	Adult female fishers (age > 2) who found a mate (mate_avail = 1) are assigned a ‘repro’ value of 1 (reproduced) or 0 (no den / did not reproduce) 
+i.	The 1 or 0 is randomly generated from the binomial distribution, with a size of 1 and range of probabilities between the 95% upper and lower confidence intervals of the appropriate populations denning rate (Lofroth et al. in review)
+3.	Kits produced
+•	Adult female fishers (age > 2) who found a mate (mate_avail = 1) and reproduced (repro = 1) have a randomly generated number of kits (rounded to whole number)
+i.	The number is randomly generated from the normal distribution, with a size of 1, based on the mean and standard deviation of the appropriate populations litter size (Lofroth et al. in review)
+•	Kits are randomly assigned as male or female with a 50:50 chance, all are set as dispersing juveniles with an age of 0
+SURVIVE
+4.	Survive
+•	All fishers 0.5 or older (i.e., don’t kill of those just born) are assigned a 1 (live) or 0 (die) 
+i.	The 1 or 0 is randomly generated from the binomial distribution, with a size of 1 and range of probabilities between the 95% upper and lower confidence intervals of the appropriate cohort and population survival rate (Rory Fogarty’s re-analysis, i.e., excludes trapping mortalities, of the survival data in Lofroth et al. in review)
+•	Fishers die if they meet any one of the following criteria:
+i.	A ‘live’ value of 0
+ii.	Males who are older than the user specified maximum age (default = 6)
+iii.	Females who are older than the user specified maximum age (default = 9)
+iv.	Any adult fisher (age > 2) who hasn’t established a territory (disperse = D)
+DISPERSE
+5.	Disperse
+•	Note: each pixel is a fisher female sized territorial (i.e., 5.5 km in length or 7.8 km in diameter)
+•	Note: this function is for moving 1 pixel for females and 2 pixels for males. To represent what actually happens within a 6 month time step, need to loop this function a minimum of 30 times (i.e. 30 steps for females, 60 steps for males)
+•	Fishers without established territories (disperse = D) will disperse
+•	Dispersing fishers will move 1 step in a randomly assigned heading
+•	Assumes a female fisher can move ~35 km in a month (hard coded in)
+i.	For females, if the patch that the female moves to contains suitable habitat (habitat = 1) and it isn’t occupied by another female, then the female establishes a territory, otherwise she continues dispersing (i.e., when habitat = 0 OR occupancy > 1)
+•	Assumes a male fisher can move ~70 km in a month (hard coded in)
+i.	For males, if the patch that the males moves to contains suitable habitat (habitat = 1) and there isn’t another male within ± 1 cell in either direction (i.e., the neighbouring 8 cells), then the male establishes a territory, otherwise he continues dispersing (i.e., when habitat = 0 OR proximity occupancy > 1)
+ii.	Because males move twice as far as females this step is repeated in this function; males can move one cell and check for suitability/occupancy and then move to a second cell and check for suitability/occupancy.
+•	For ease of calculations, assume a ‘dist_mov’ of 1.0 is one pixel (user specified through function argument); the assumption is that ‘dist_mov’ relates to the number of cells and although this might not be quite right if the fisher is moving diagonally across a cell, it generally works for our purposes and allows for some variability in distances moved, similar to the real world
+•	This means that a female fisher can move between 5-6 pixels per month or 30-36 pixels in each time step
+•	For simplicity, a male fisher can move 2*dist_mov (twice the distance of a female)
+•	User specified if fishers can move out of the world; default is set to FALSE and likely will stay as FALSE until some other mechanism is in place to keep fishers in the study area (i.e., code in dispersal with an attraction to some feature, such as BEC zone)
+i.	Note that the function is written so that if out=TRUE then the function won’t break if the fisher is on “NA” habitat / pixel
+
+
+## Output data   
+
+Once the FLEX tool has run (i.e., the IBM simulations have completed, currently have it set to 100 simulations per scenario although may change depending on extent of scenarios) the user can download two types of outputs: pdf report and a raster object ‘heatmap’ of where fishers are predicted to be (i.e., summing the mean number of fishers per female fisher territory over the 100 simulations). The pdf report will be generated in R markdown and provide basic summary statistics for the area of interest at the start of the simulation (i.e., current conditions) and a map of the area in relation to the appropriate fisher population(s).
+
+```{r moduleOutputs, echo = FALSE, eval = TRUE}
+# df_outputs <- SpaDES.core::moduleOutputs("FLEX", "C:/Users/Tati/Documents/GitHub")
+# knitr::kable(df_outputs)
+```
+
+# Links to other modules   
+
+The raster output from this module will be available for the CLUS SpaDES modules as an input object, this will allow for dynamic fisher and landbase simulations in future iterations of both CLUS and FLEX.
