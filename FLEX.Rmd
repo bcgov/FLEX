@@ -118,7 +118,6 @@ mySimOut$fisherABMReport
 #                            sd =  repro_rate_table [Fpop == 2 & Param == 'DR', SD])))
 
 ```
-
 #Plot
 ```{r}
 rast.stk<- rast(paste0 (here::here(), "/R/SpaDES-modules/FLEX/quesnel.tif"))

@@ -1,0 +1,9 @@
+## ignore all
+*
+
+## don't ignore
+!CHECKSUMS.txt
+!.gitignore
+!*.csv
+!.RData
+!IBM_aoi_Pex2.qs
