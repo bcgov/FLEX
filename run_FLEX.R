@@ -20,7 +20,7 @@ source("FLEX_core.R", echo = TRUE)
 ## ---- Inputs -------------------------------------------------------
 
 ## Habitat raster
-habitat_raster <- here("fisher_hab_data/Lakes/FLEX_2055_init.tif")
+habitat_raster <- here("fisher_hab_data/FLEX_BuMo2023_init.tif")
 
 # ---- Load raster ----
 rast_stack <- rast(habitat_raster)
@@ -70,7 +70,7 @@ res <- run_flex_model(
   female_hr_table     = female_hr_table,
   survival_rate_table = survival_rate_table,
   repro_rate_table    = repro_rate_table,
-  project_years       = 20,
+  project_years       = 5,
   burn_in             = 5
 )
 

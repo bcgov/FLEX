@@ -15,14 +15,16 @@ library(sf)
 # 1. Read habitat rasters (from your habitat script)
 # --------------------------------------------------
 
-year <- 2055
+year <- 2023
 
-den  <- rast(paste0("fisher_hab_data/denning_",year,".tif"))
-rust <- rast(paste0("fisher_hab_data/rest_rust_",year,".tif"))
-cav  <- rast(paste0("fisher_hab_data/rest_cavity_",year,".tif"))
-cwd  <- rast(paste0("fisher_hab_data/rest_cwd_",year,".tif"))
-mov  <- rast(paste0("fisher_hab_data/movement_",year,".tif"))
-opn  <- rast(paste0("fisher_hab_data/open_",year,".tif"))
+aoi_name <- "BuMo"
+
+den  <- rast(paste0("fisher_hab_data/denning_",aoi_name,year,".tif"))
+rust <- rast(paste0("fisher_hab_data/rest_rust_",aoi_name,year,".tif"))
+cav  <- rast(paste0("fisher_hab_data/rest_cavity_",aoi_name,year,".tif"))
+cwd  <- rast(paste0("fisher_hab_data/rest_cwd_",aoi_name,year,".tif"))
+mov  <- rast(paste0("fisher_hab_data/movement_",aoi_name,year,".tif"))
+opn  <- rast(paste0("fisher_hab_data/open_",aoi_name,year,".tif"))
 
 # --------------------------------------------------
 # 2. Pixel ID raster (required)
@@ -107,7 +109,7 @@ hab_stack <- c(
 
 writeRaster(
   hab_stack,
-  paste0("fisher_hab_data/FLEX_",year,"_init.tif"),
+  paste0("fisher_hab_data/FLEX_",aoi_name,year,"_init.tif"),
   overwrite = TRUE
 )
 
